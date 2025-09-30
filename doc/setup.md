@@ -1,11 +1,11 @@
 # Setup
 
-<!-- ## 1. Pull Submodules
+## 1. Pull Submodules
 
 The following code will pull external git submodules. It needs to be run only once (after `git clone` of the sam3d codebase).
 ```bash
 git submodule update --init --recursive
-``` -->
+```
 
 ## 2. Setup Python Environment
 
