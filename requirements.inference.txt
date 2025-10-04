@@ -1,4 +1,3 @@
 kaolin==0.17.0
 gsplat @ git+https://github.com/nerfstudio-project/gsplat.git@2323de5905d5e90e035f792fe65bad0fedd413e7
 seaborn==0.13.2
-diff_gaussian_rasterization @ git+https://github.com/autonomousvision/mip-splatting.git@dda02ab5ecf45d6edb8c540d9bb65c7e451345a9#subdirectory=submodules/diff-gaussian-rasterization
