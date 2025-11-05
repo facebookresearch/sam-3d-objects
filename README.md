@@ -46,36 +46,15 @@ Have a look at our two jupyter notebooks.
 * [single object](notebook/demo_single_object.ipynb)
 * [multi object](notebook/demo_multi_object.ipynb)
 
-## Model Description
-
-### SAM 3D checkpoints
-
-The table below shows the SAM 3D Objects checkpoints released on October 20, 2025.
-
-|      **Model**       | **Size (M)** |    **Speed (FPS)**     | **<Dataset> test (PCK @ 0.05)** | **<Dataset> test (MPJPE)** |
-| :------------------: | :----------: | :--------------------: | :-----------------: | :----------------: |
-
-
-< TODO: Update when we run speedtests >
-Speed measured on an A100 with `torch 2.5.1, cuda 12.4`. See `benchmark.py` for an example on benchmarking (compiling all the model components). Compiling only the image encoder can be more flexible and also provide (a smaller) speed-up (set `compile_image_encoder: True` in the config).
-
-## Web demo for SAM 3D
-
-< Link to Web Demo >
-
 ## Contributing
 
 See [contributing](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 
-## Contributors
+## SAM 3D Body
 
-The SAM 3D project was made possible with the help of many contributors (alphabetical):
+TODO
 
-< List of collaborators here >
-
-Third-party code: < Credit third party code here >
-
-## Citing SAM 3D
+## Citing SAM 3D Objects
 
 If you use SAM 3D Objects in your research, please use the following BibTeX entry.
 
