@@ -8,7 +8,7 @@
 
 ![](doc/arch.png)
 
-**Segment Anything 3D Models (SAM 3D)** is a pair of foundation models towards solving 3D perception from monocular views. < MORE DETAILS HERE>
+**SAM 3D Objects** is a foundation model that reconstructs full 3D shape geometry, texture, and layout from a single image, excelling in real-world scenarios with occlusion and clutter by using progressive training and a data engine with human feedback. It outperforms prior 3D generation models in human preference tests on real-world objects and scenes. We released code, weights, online demo, and a new challenging benchmark.
 
 ## Latest updates
 
