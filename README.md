@@ -12,12 +12,7 @@
 
 ## Latest updates
 
-**10/20/2025 -- Checkpoints Launched, Web Demo and Paper are out**
-- < MORE DETAILS HERE >
-
-## Installation
-
-< INSTALLATION INSTRUCTIONS HERE >
+**11/19/2025** - Checkpoints Launched, Web Demo and Paper are out.
 
 ## Getting Started
 
