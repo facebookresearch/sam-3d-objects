@@ -46,13 +46,15 @@ Have a look at our two jupyter notebooks.
 * [single object](notebook/demo_single_object.ipynb)
 * [multi object](notebook/demo_multi_object.ipynb)
 
+## SAM 3D Body
+
+[SAM 3D Body (3DB)](https://github.com/facebookresearch/sam-3d-body) is a robust promptable foundation model for single-image 3D human mesh recovery (HMR).
+
+As a way to combine the strengths of both **SAM 3D Objects** and **SAM 3D Body**, we provide an example notebook that demonstrates how to combine the results of both models such that they are aligned in the same frame of reference. Check it out [here](notebook/demo_3db_mesh_alignment.ipynb).
+
 ## Contributing
 
 See [contributing](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
-
-## SAM 3D Body
-
-TODO
 
 ## Citing SAM 3D Objects
 
