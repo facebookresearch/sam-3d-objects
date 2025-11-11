@@ -47,32 +47,3 @@ hf download \
 mv checkpoints/${TAG}-download/checkpoints checkpoints/${TAG}
 rm -rf checkpoints/${TAG}-download
 ```
-
-### From Meta
-
-```bash
-TAG=public_v1
-CHECKPOINT_PATH=checkpoints/${TAG}
-FILES=(
-    pipeline.yaml
-    slat_decoder_mesh.pt
-    slat_decoder_mesh.yaml
-    slat_generator.ckpt
-    slat_generator.yaml
-    ss_decoder.ckpt
-    ss_decoder.yaml
-    ss_encoder.safetensors
-    ss_encoder.yaml
-    ss_generator.ckpt
-    ss_generator.yaml
-    slat_decoder_gs.ckpt
-    slat_decoder_gs.yaml
-    slat_decoder_gs_4.ckpt
-    slat_decoder_gs_4.yaml
-)
-
-mkdir -p ${CHECKPOINT_PATH}
-for file in "${FILES[@]}"; do
-  wget -xv http://dl.fbaipublicfiles.com/sam-3d-objects/checkpoints/${TAG}/${file} -O ${CHECKPOINT_PATH}/${file}
-done
-```
