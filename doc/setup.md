@@ -12,7 +12,7 @@ git submodule update --init --recursive
 The following will install the default environment. If you use `conda` instead of `mamba`, replace its name in the first two lines. Note that you may have to build the environment on a compute node with GPU (e.g., you may get a `RuntimeError: Not compiled with GPU support` error when running certain parts of the code that use Pytorch3D).
 
 ```bash
-# create sam3d-imag environment
+# create sam3d-objects environment
 mamba env create -f environments/default.yml
 mamba activate sam3d-objects
 
