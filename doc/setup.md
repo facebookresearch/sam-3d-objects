@@ -2,7 +2,7 @@
 
 ## 1. Pull Submodules
 
-The following code will pull external git submodules. It needs to be run only once (after `git clone` of the sam3d codebase).
+The following code will pull external git submodules. It needs to be run only once (after `git clone ...`).
 ```bash
 git submodule update --init --recursive
 ```
