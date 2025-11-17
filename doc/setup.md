@@ -36,7 +36,7 @@ pip install -e '.[inference]'
 ### From HuggingFace
 
 ```bash
-pip install -U "huggingface_hub[cli]"
+pip install 'huggingface-hub[cli]<1.0'
 
 TAG=hf
 hf download \
