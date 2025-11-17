@@ -25,18 +25,19 @@ SAM 3D Objects can convert masked objects in an image, into 3D models with pose.
 ```python
 # import inference code
 sys.path.append("notebook")
-from inference import Inference, load_image
+from inference import Inference, load_image, load_single_mask
 
 # load model
-tag = "public_v1"
+tag = "hf"
 config_path = f"checkpoints/{tag}/pipeline.yaml"
 inference = Inference(config_path, compile=False)
 
 # load image (RGBA only, mask is embedded in the alpha channel)
-image = load_image("notebook/images/single/hf_3d_arena/a_baby_penguin_wearing_a_blue_hat.png")
+image = load_image("notebook/images/shutterstock_stylish_kidsroom_1640806567/image.png")
+mask = load_single_mask("notebook/images/shutterstock_stylish_kidsroom_1640806567", index=14)
 
 # run model
-output = inference(image, seed=42)
+output = inference(image, mask, seed=42)
 
 # export gaussian splat
 output["gs"].save_ply(f"splat.ply")
