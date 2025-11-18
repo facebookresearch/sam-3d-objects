@@ -14,9 +14,9 @@
 
 <img src="doc/teddy.png" style="display: block; margin: 0 auto"/>
 
-<img src="doc/arrow.png" style="display: block; margin: 0 auto"/>
+<img src="doc/arrow.png" width="33%" style="display: block; margin-left: 33%"/>
 
-<img src="doc/teddy-3d.gif" style="display: block; margin: 0 auto" />
+<img src="doc/teddy-3d.gif" width="100%" style="display: block; margin: 0 auto" />
 
 ## Latest updates
 
