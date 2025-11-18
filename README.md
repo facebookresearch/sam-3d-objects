@@ -12,11 +12,11 @@
 
 **SAM 3D Objects** is a foundation model that reconstructs full 3D shape geometry, texture, and layout from a single image, excelling in real-world scenarios with occlusion and clutter by using progressive training and a data engine with human feedback. It outperforms prior 3D generation models in human preference tests on real-world objects and scenes. We released code, weights, online demo, and a new challenging benchmark.
 
-<img src="doc/teddy.png" style="display: block; margin: 0 auto"/>
+<p align="center"><img src="doc/teddy.png"/></p>
 
-<img src="doc/arrow.png" width="33%" style="display: block; margin-left: 33%"/>
+<p align="center"><img src="doc/arrow.png"/></p>
 
-<img src="doc/teddy-3d.gif" width="100%" style="display: block; margin: 0 auto" />
+<p align="center"><img src="doc/teddy-3d.gif"/></p>
 
 ## Latest updates
 
