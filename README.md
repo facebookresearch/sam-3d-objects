@@ -31,6 +31,8 @@ Follow the [setup](doc/setup.md) steps before running the following.
 SAM 3D Objects can convert masked objects in an image, into 3D models with pose.
 
 ```python
+import sys
+
 # import inference code
 sys.path.append("notebook")
 from inference import Inference, load_image, load_single_mask
