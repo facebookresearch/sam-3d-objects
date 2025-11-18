@@ -8,15 +8,13 @@
 
 [[`<REPLACE ME Paper>`](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/)] [[`<REPLACE ME Project>`](https://ai.meta.com/sam2)] [[`<REPLACE ME Demo>`](https://sam2.metademolab.com/)] [[`<REPLACE ME Dataset>`](https://ai.meta.com/datasets/segment-anything-video)] [[`<REPLACE ME Blog>`](https://ai.meta.com/blog/segment-anything-2)] [[`<REPLACE ME BibTeX>`](#citing-sam-2)]
 
-![](doc/arch.png)
-
 **SAM 3D Objects** is a foundation model that reconstructs full 3D shape geometry, texture, and layout from a single image, excelling in real-world scenarios with occlusion and clutter by using progressive training and a data engine with human feedback. It outperforms prior 3D generation models in human preference tests on real-world objects and scenes. We released code, weights, online demo, and a new challenging benchmark.
 
-<p align="center"><img src="doc/teddy.png"/></p>
+<p align="center"><img src="doc/intro.png"/></p>
 
-<p align="center"><img src="doc/arrow.png"/></p>
+<p align="center"><img src="doc/arch.png"/></p>
 
-<p align="center"><img src="doc/teddy-3d.gif"/></p>
+<p align="center"><img src="doc/comparisons.png"/></p>
 
 ## Latest updates
 
@@ -56,6 +54,14 @@ output["gs"].save_ply(f"splat.ply")
 Have a look at our two jupyter notebooks.
 * [single object](notebook/demo_single_object.ipynb)
 * [multi object](notebook/demo_multi_object.ipynb)
+
+They produce results like the following.
+
+<p align="center"><img src="doc/teddy.png"/></p>
+
+<p align="center"><img src="doc/arrow.png"/></p>
+
+<p align="center"><img src="doc/teddy-3d.gif"/></p>
 
 ## SAM 3D Body
 
