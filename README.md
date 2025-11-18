@@ -63,6 +63,10 @@ Have a look at our two jupyter notebooks.
 
 As a way to combine the strengths of both **SAM 3D Objects** and **SAM 3D Body**, we provide an example notebook that demonstrates how to combine the results of both models such that they are aligned in the same frame of reference. Check it out [here](notebook/demo_3db_mesh_alignment.ipynb).
 
+## License
+
+The SAM 3D Objects model checkpoints and code are licensed under [SAM License](./LICENSE).
+
 ## Contributing
 
 See [contributing](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
