@@ -82,6 +82,58 @@ The SAM 3D Objects model checkpoints and code are licensed under [SAM License](.
 
 See [contributing](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 
+## Contributors
+
+The SAM 3D Objects project was made possible with the help of many contributors.
+
+Robbie Adkins,
+Paris Baptiste,
+Karen Bergan,
+Kai Brown,
+Michelle Chan,
+Ida Cheng,
+Khadijat Durojaiye,
+Patrick Edwards,
+Daniella Factor,
+Facundo Figueroa,
+Rene  de la Fuente,
+Eva Galper,
+Cem Gokmen,
+Alex He,
+Emmanuel Hernandez,
+Dex Honsa,
+Leonna Jones,
+Arpit Kalla,
+Kris Kitani,
+Helen Klein,
+Kei Koyama,
+Robert Kuo,
+Vivian Lee,
+Alex Lende,
+Jonny Li,
+Kehan Lyu,
+Faye Ma,
+Mallika Malhotra,
+Sasha Mitts,
+William Ngan,
+George Orlin,
+Peter Park,
+Don Pinkus,
+Roman Radle,
+Nikhila Ravi,
+Azita Shokrpour,
+Jasmine Shone,
+Zayida Suber,
+Phillip Thomas,
+Tatum Turner,
+Joseph Walker,
+Meng Wang,
+Claudette Ward,
+Andrew Westbury,
+Nan Yang,
+Yael Yungster
+
+
 ## Citing SAM 3D Objects
 
 If you use SAM 3D Objects in your research, please use the following BibTeX entry.
