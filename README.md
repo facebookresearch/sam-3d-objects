@@ -17,10 +17,6 @@
 
 <p align="center"><img src="doc/arch.png"/></p>
 
------
-
-<p align="center"><img src="doc/comparisons.png"/></p>
-
 ## Latest updates
 
 **11/19/2025** - Checkpoints Launched, Web Demo and Paper are out.
