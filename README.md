@@ -29,7 +29,7 @@ SAM 3D Objects is one part of SAM 3D, a pair of models for object and human shap
 
 Follow the [setup](doc/setup.md) steps before running the following.
 
-## Single or Multi-Object 3D generation.
+## Single or Multi-Object 3D Generation
 
 SAM 3D Objects can convert masked objects in an image, into 3D models with pose, shape, texture, and layout. SAM 3D is designed to be robust in challenging natural images, handling small objects and occlusions, unusual poses, and difficult situations encountered in uncurated natural scenes like this kidsroom:
 
