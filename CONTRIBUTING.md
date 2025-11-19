@@ -1,4 +1,4 @@
-# Contributing to __________
+# Contributing to sam-3d-objects
 We want to make contributing to this project as easy and transparent as
 possible.
 
@@ -35,5 +35,5 @@ outlined on that page and do not file a public issue.
 * ...
 
 ## License
-By contributing to __________, you agree that your contributions will be licensed
+By contributing to sam-3d-objects, you agree that your contributions will be licensed
 under the LICENSE file in the root directory of this source tree.
