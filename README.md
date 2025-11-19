@@ -1,7 +1,6 @@
 # SAM 3D
 
-SAM 3D is in fact two models, bla bla, bla, link to 3D.
-SAM 3D Object check below.
+SAM 3D Objects is one part of SAM 3D, a pair of models for object and human shape reconstruction.  If you’re looking for SAM 3D Body, [click here](https://github.com/facebookresearch/sam-3d-body).
 
 # SAM 3D Objects
 
