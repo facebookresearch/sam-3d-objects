@@ -25,13 +25,20 @@ SAM 3D Objects is one part of SAM 3D, a pair of models for object and human shap
 
 **11/19/2025** - Checkpoints Launched, Web Demo and Paper are out.
 
-## Getting Started
+## Installation
 
 Follow the [setup](doc/setup.md) steps before running the following.
 
-### Single or Multi-Object 3D generation.
+## Single or Multi-Object 3D generation.
 
-SAM 3D Objects can convert masked objects in an image, into 3D models with pose.
+SAM 3D Objects can convert masked objects in an image, into 3D models with pose, shape, texture, and layout. SAM 3D is designed to be robust in challenging natural images, handling small objects and occlusions, unusual poses, and difficult situations encountered in uncurated natural scenes like this kidsroom:
+
+<p align="center">
+  <img src="notebook/images/shutterstock_stylish_kidsroom_1640806567/image.png" width="55%"/>
+  <img src="doc/kidsroom_transparent.gif" width="40%"/>
+</p>
+
+For a quick start, run `python demo.py` or use the the following lines of code:
 
 ```python
 import sys
@@ -45,7 +52,7 @@ tag = "hf"
 config_path = f"checkpoints/{tag}/pipeline.yaml"
 inference = Inference(config_path, compile=False)
 
-# load image (RGBA only, mask is embedded in the alpha channel)
+# load image (RGBA onkidsroly, mask is embedded in the alpha channel)
 image = load_image("notebook/images/shutterstock_stylish_kidsroom_1640806567/image.png")
 mask = load_single_mask("notebook/images/shutterstock_stylish_kidsroom_1640806567", index=14)
 
@@ -56,17 +63,10 @@ output = inference(image, mask, seed=42)
 output["gs"].save_ply(f"splat.ply")
 ```
 
-Have a look at our two jupyter notebooks.
+For  more deatils and multi-object reconstruction, please take a look at out two jupyther notebooks:
 * [single object](notebook/demo_single_object.ipynb)
 * [multi object](notebook/demo_multi_object.ipynb)
 
-They produce results like the following.
-
-<p align="center"><img src="doc/teddy.png"/></p>
-
-<p align="center"><img src="doc/arrow.png"/></p>
-
-<p align="center"><img src="doc/teddy-3d.gif"/></p>
 
 ## SAM 3D Body
 
