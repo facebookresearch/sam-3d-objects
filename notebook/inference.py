@@ -29,15 +29,11 @@ from pytorch3d.transforms import quaternion_multiply, quaternion_invert
 
 import sam3d_objects  # REMARK(Pierre) : do not remove this import
 from sam3d_objects.pipeline.inference_pipeline_pointmap import InferencePipelinePointMap
-from sam3d_objects.model.backbone.trellis.utils import render_utils
+from sam3d_objects.model.backbone.tdfy_dit.utils import render_utils
 
 from sam3d_objects.utils.visualization import SceneVisualizer
 
 __all__ = ["Inference"]
-
-# concatenate "li" + "dra" to skip the automated string replacement
-if "li" + "dra" not in sys.modules:
-    sys.modules["li" + "dra"] = sam3d_objects
 
 WHITELIST_FILTERS = [
     lambda target: target.split(".", 1)[0] in {"sam3d_objects", "torch", "torchvision", "moge"},
@@ -107,7 +103,7 @@ class Inference:
         image: Union[Image.Image, np.ndarray],
         mask: Optional[Union[None, Image.Image, np.ndarray]],
         seed: Optional[int] = None,
-        pointmap=None,  # TODO(Pierre) : add pointmap type
+        pointmap=None,
     ) -> dict:
         image = self.merge_mask_to_rgba(image, mask)
         return self._pipeline.run(

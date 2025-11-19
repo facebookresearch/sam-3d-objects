@@ -18,15 +18,6 @@ from sam3d_objects.utils.visualization.plotly.save_scene import make_video as ma
 import seaborn as sns
 import copy
 
-# # TODO: Use these when we plot multiple instances in the scene
-# from sam3d_objects.data.dataset.tdfy.kubric.vis import get_instance_colors
-# from sam3d_objects.data.dataset.tdfy.kubric.vis import (
-#     segmentation_to_rgb,
-#     depth_to_rgb,
-#     html_show_instance_ids,
-#     plot_bboxes,
-# )
-
 
 class SceneVisualizer:
     make_video_from_fig = make_scene_video

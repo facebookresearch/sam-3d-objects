@@ -133,7 +133,6 @@ class SparseStructureFlowModel(nn.Module):
             coords = torch.stack(coords, dim=-1).reshape(-1, 3)
             pos_emb = pos_embedder(coords)
             if include_pose:
-                # TODO Hao: right now use fixed embedding just to verify model
                 pose_pos_emb = torch.ones(1, model_channels) * 0.5
                 pos_emb = torch.cat([pos_emb, pose_pos_emb], dim=0)
             self.register_buffer("pos_emb", pos_emb)

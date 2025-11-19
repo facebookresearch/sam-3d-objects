@@ -68,8 +68,6 @@ class SparseTransformerBase(nn.Module):
         self.use_fp16 = use_fp16
         self.use_checkpoint = use_checkpoint
         self.qk_rms_norm = qk_rms_norm
-        # TODO(Hao): this is weird need to double check. The model weights use
-        # torch.bfloat16 in ...modules.utils.FP16_TYPE. This is to be compatible with that.
         self.dtype = torch.float16 if use_fp16 else torch.float32
 
         if pe_mode == "ape":

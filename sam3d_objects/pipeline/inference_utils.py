@@ -1,7 +1,4 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
-# TODO: Sasha wrapper for the PoseTarget decoder
-# TODO: Hao connect the function
-
 import torch
 import numpy as np
 import open3d as o3d
@@ -212,7 +209,7 @@ def layout_post_optimization(
     A = M[:3, :3]
     scale_final = A.norm(dim=1)[None]
     R_final = A / scale_final[:, None]
-    quat_final = matrix_to_quaternion(R_final)[None]
+    quat_final = matrix_to_quaternion(R_final)
 
     return (
         quat_final,

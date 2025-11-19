@@ -46,7 +46,6 @@ class SLatGaussianDecoder(SparseTransformerBase):
             use_checkpoint=use_checkpoint,
             qk_rms_norm=qk_rms_norm,
         )
-        # TODO: make those arguments explicitly
         self.resolution = resolution
         self.rep_config = representation_config
         self._calc_layout()

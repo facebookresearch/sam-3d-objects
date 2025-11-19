@@ -1,29 +1,44 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 from typing import Union, Optional
-from sam3d_objects.model.backbone.dit.embedder.pointmap import PointPatchEmbed
+from copy import deepcopy
 import numpy as np
 import torch
 from tqdm import tqdm
-from torch.utils._pytree import tree_map_only
 import torchvision
 from loguru import logger
-from functools import wraps
 from PIL import Image
 
+from pytorch3d.renderer import look_at_view_transform
 from pytorch3d.transforms import Transform3d
 
+from sam3d_objects.model.backbone.dit.embedder.pointmap import PointPatchEmbed
 from sam3d_objects.pipeline.inference_pipeline import InferencePipeline
-from sam3d_objects.model.backbone.trellis.utils import postprocessing_utils
 from sam3d_objects.data.dataset.tdfy.img_and_mask_transforms import (
     get_mask,
 )
-from sam3d_objects.data.dataset.tdfy.trellis.pose_loader import R3
-from sam3d_objects.data.dataset.tdfy.trellis.dataset import PerSubsetDataset
-from sam3d_objects.data.dataset.tdfy.img_and_mask_transforms import normalize_pointmap_ssi
+from sam3d_objects.data.dataset.tdfy.transforms_3d import (
+    DecomposedTransform,
+)
 from sam3d_objects.pipeline.utils.pointmap import infer_intrinsics_from_pointmap
-from copy import deepcopy
-import open3d as o3d
 from sam3d_objects.pipeline.inference_utils import o3d_plane_estimation, estimate_plane_area
+
+
+def camera_to_pytorch3d_camera(device="cpu") -> DecomposedTransform:
+    """
+    R3 camera space --> PyTorch3D camera space
+    Also needed for pointmaps
+    """
+    r3_to_p3d_R, r3_to_p3d_T = look_at_view_transform(
+        eye=np.array([[0, 0, -1]]),
+        at=np.array([[0, 0, 0]]),
+        up=np.array([[0, -1, 0]]),
+        device=device,
+    )
+    return DecomposedTransform(
+        rotation=r3_to_p3d_R,
+        translation=r3_to_p3d_T,
+        scale=torch.tensor(1.0, dtype=r3_to_p3d_R.dtype, device=device),
+    )
 
 
 def recursive_fn_factory(fn):
@@ -89,12 +104,6 @@ class InferencePipelinePointMap(InferencePipeline):
         torch._dynamo.config.capture_scalar_outputs = True
         compile_mode = "max-autotune"
 
-        # self.depth_model.model.forward = compile_wrapper(
-        #     self.depth_model.model.forward,
-        #     mode=compile_mode,
-        #     fullgraph=True,
-        # )
-
         for embedder, _ in self.condition_embedders[
             "ss_condition_embedder"
         ].embedder_list:
@@ -117,36 +126,6 @@ class InferencePipelinePointMap(InferencePipeline):
             mode=compile_mode,
             fullgraph=True,
         )
-
-        if self.models["layout_model"] is not None:
-            self.models["layout_model"].reverse_fn.inner_forward = compile_wrapper(
-                self.models["layout_model"].reverse_fn.inner_forward,
-                mode=compile_mode,
-                fullgraph=True,
-            )
-
-            if self.condition_embedders["layout_condition_embedder"] is not None:
-                # we move the condition embedder outside the reverse_fn
-                embedder_list = self.condition_embedders[
-                    "layout_condition_embedder"
-                ].embedder_list
-            else:
-                raise NotImplementedError
-
-            for embedder, _ in embedder_list:
-                if isinstance(embedder, PointPatchEmbed):
-                    logger.info("Found PointPatchEmbed")
-                    embedder.inner_forward = compile_wrapper(
-                        embedder.inner_forward,
-                        mode=compile_mode,
-                        fullgraph=True,
-                    )
-                else:
-                    embedder.forward = compile_wrapper(
-                        embedder.forward,
-                        mode=compile_mode,
-                        fullgraph=True,
-                    )
 
         self.models["ss_decoder"].forward = compile_wrapper(
             self.models["ss_decoder"].forward,
@@ -171,18 +150,12 @@ class InferencePipelinePointMap(InferencePipeline):
                     ss_input_dict = self.preprocess_image(
                         image, self.ss_preprocessor, pointmap=pointmap
                     )
-                    if self.models["layout_model"] is not None:
-                        layout_input_dict = self.preprocess_image(
-                            image, self.layout_preprocessor, pointmap=pointmap
-                        )
-                    else:
-                        layout_input_dict = {}
                     ss_return_dict = self.sample_sparse_structure(
                         ss_input_dict, inference_steps=None
                     )
 
                     _ = self.run_layout_model(
-                        layout_input_dict,
+                        ss_input_dict,
                         ss_return_dict,
                         inference_steps=None,
                     )
@@ -279,7 +252,7 @@ class InferencePipelinePointMap(InferencePipeline):
             pointmaps = output["pointmaps"]
             camera_convention_transform = (
                 Transform3d()
-                .rotate(R3.r3_camera_to_pytorch3d_camera(device=self.device).rotation)
+                .rotate(camera_to_pytorch3d_camera(device=self.device).rotation)
                 .to(self.device)
             )
             points_tensor = camera_convention_transform.transform_points(pointmaps)
@@ -333,7 +306,7 @@ class InferencePipelinePointMap(InferencePipeline):
             )
         )
         return {
-            "quaternion": revised_quat,
+            "rotation": revised_quat,
             "translation": revised_t,
             "scale": revised_scale,
             "iou": final_iou,
@@ -358,10 +331,8 @@ class InferencePipelinePointMap(InferencePipeline):
         decode_formats=None,
         estimate_plane=False,
     ) -> dict:
-        logger.info("InferencePipelinePointMap.run() called")
-        # This should only happen if called from demo
         image = self.merge_image_and_mask(image, mask)
-        with self.device:  # TODO(Pierre) make with context a decorator ?
+        with self.device: 
             pointmap_dict = self.compute_pointmap(image, pointmap)
             pointmap = pointmap_dict["pointmap"]
             pts = type(self)._down_sample_img(pointmap)
@@ -373,13 +344,6 @@ class InferencePipelinePointMap(InferencePipeline):
             ss_input_dict = self.preprocess_image(
                 image, self.ss_preprocessor, pointmap=pointmap
             )
-            if self.models["layout_model"] is not None:
-                layout_input_dict = self.preprocess_image(
-                    image, self.layout_preprocessor, pointmap=pointmap
-                )
-            else:
-                layout_input_dict = {}
-
 
             slat_input_dict = self.preprocess_image(image, self.slat_preprocessor)
             if seed is not None:
@@ -390,24 +354,9 @@ class InferencePipelinePointMap(InferencePipeline):
                 use_distillation=use_stage1_distillation,
             )
 
-            # This is for decoupling oriented shape and layout model
-            # ss_input_dict["x_shape_latent"] = ss_return_dict["shape"]
-            layout_return_dict = self.run_layout_model(
-                layout_input_dict,
-                ss_return_dict,
-                inference_steps=stage1_inference_steps,
-                use_distillation=use_stage1_distillation,
-            )
-            ss_return_dict.update(layout_return_dict)
-
             # We could probably use the decoder from the models themselves
             pointmap_scale = ss_input_dict.get("pointmap_scale", None)
             pointmap_shift = ss_input_dict.get("pointmap_shift", None)
-            # Overwrite with layout_input_dict values if they exist
-            if "pointmap_scale" in layout_input_dict:
-                pointmap_scale = layout_input_dict["pointmap_scale"]
-            if "pointmap_shift" in layout_input_dict:
-                pointmap_shift = layout_input_dict["pointmap_shift"]
             ss_return_dict.update(
                 self.pose_decoder(
                     ss_return_dict,
@@ -455,7 +404,7 @@ class InferencePipelinePointMap(InferencePipeline):
                         deepcopy(glb),
                         pointmap_dict["intrinsics"],
                         ss_return_dict,
-                        layout_input_dict,
+                        ss_input_dict,
                     )
                     ss_return_dict.update(postprocessed_pose)
             except Exception as e:

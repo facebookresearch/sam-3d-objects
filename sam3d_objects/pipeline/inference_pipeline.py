@@ -40,13 +40,11 @@ from sam3d_objects.pipeline.inference_utils import (
 
 from sam3d_objects.model.io import (
     load_model_from_checkpoint,
-    remove_prefix_state_dict_fn,
-    add_prefix_state_dict_fn,
     filter_and_remove_prefix_state_dict_fn,
 )
 
-from sam3d_objects.model.backbone.trellis.modules import sparse as sp
-from sam3d_objects.model.backbone.trellis.utils import postprocessing_utils
+from sam3d_objects.model.backbone.tdfy_dit.modules import sparse as sp
+from sam3d_objects.model.backbone.tdfy_dit.utils import postprocessing_utils
 from safetensors.torch import load_file
 
 
@@ -65,26 +63,19 @@ class InferencePipeline:
         slat_decoder_mesh_ckpt_path,
         slat_decoder_gs_4_config_path=None,
         slat_decoder_gs_4_ckpt_path=None,
-        layout_model_config_path=None,
-        layout_model_ckpt_path=None,
         ss_encoder_config_path=None,
         ss_encoder_ckpt_path=None,
         decode_formats=["gaussian", "mesh"],
         dtype="bfloat16",
         pad_size=1.0,
         version="v0",
-        device="cuda",  # TODO(Pierre) : Should default to "cpu", but leaving "cuda" as default for backward compatibility
+        device="cuda",
         ss_preprocessor=preprocess_utils.get_default_preprocessor(),
         slat_preprocessor=preprocess_utils.get_default_preprocessor(),
-        layout_preprocessor=preprocess_utils.get_default_preprocessor(),
         ss_condition_input_mapping=["image"],
         slat_condition_input_mapping=["image"],
-        layout_condition_input_mapping=["image"],
         pose_decoder_name="default",
         workspace_dir="",
-        use_layout_result=False,
-        force_shape_in_layout=False,
-        use_pretrained_slat=True,
         downsample_ss_dist=0,  # the distance we use to downsample
         ss_inference_steps=25,
         ss_rescale_t=3,
@@ -96,12 +87,10 @@ class InferencePipeline:
         slat_cfg_strength=5,
         slat_cfg_interval=[0, 500],
         rendering_engine: str = "nvdiffrast",  # nvdiffrast OR pytorch3d,
-        layout_model_dtype=None,
         shape_model_dtype=None,
         compile_model=False,
         slat_mean=SLAT_MEAN,
         slat_std=SLAT_STD,
-        use_pretrained_ss=False,
     ):
         self.rendering_engine = rendering_engine
         self.device = torch.device(device)
@@ -109,16 +98,13 @@ class InferencePipeline:
         logger.info(f"self.device: {self.device}")
         logger.info(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', None)}")
         logger.info(f"Actually using GPU: {torch.cuda.current_device()}")
-        with self.device:  # TODO(Pierre) make with context a decorator ?
+        with self.device:
             self.decode_formats = decode_formats
             self.pad_size = pad_size
             self.version = version
             self.ss_condition_input_mapping = ss_condition_input_mapping
             self.slat_condition_input_mapping = slat_condition_input_mapping
-            self.layout_condition_input_mapping = layout_condition_input_mapping
             self.workspace_dir = workspace_dir
-            self.use_pretrained_slat = use_pretrained_slat
-            self.force_shape_in_layout = force_shape_in_layout
             self.downsample_ss_dist = downsample_ss_dist
             self.ss_inference_steps = ss_inference_steps
             self.ss_rescale_t = ss_rescale_t
@@ -129,13 +115,8 @@ class InferencePipeline:
             self.slat_rescale_t = slat_rescale_t
             self.slat_cfg_strength = slat_cfg_strength
             self.slat_cfg_interval = slat_cfg_interval
-            self.use_pretrained_ss = use_pretrained_ss
 
             self.dtype = self._get_dtype(dtype)
-            if layout_model_dtype is None:
-                self.layout_model_dtype = self.dtype
-            else:
-                self.layout_model_dtype = self._get_dtype(layout_model_dtype)
             if shape_model_dtype is None:
                 self.shape_model_dtype = self.dtype
             else:
@@ -146,7 +127,6 @@ class InferencePipeline:
             self.pose_decoder = self.init_pose_decoder(ss_generator_config_path, pose_decoder_name)
             self.ss_preprocessor = self.init_ss_preprocessor(ss_preprocessor, ss_generator_config_path)
             self.slat_preprocessor = slat_preprocessor
-            self.layout_preprocessor = self.init_ss_preprocessor(layout_preprocessor, layout_model_config_path)
     
             logger.info("Loading model weights...")
 
@@ -171,9 +151,6 @@ class InferencePipeline:
             slat_decoder_mesh = self.init_slat_decoder_mesh(
                 slat_decoder_mesh_config_path, slat_decoder_mesh_ckpt_path
             )
-            layout_model = self.init_layout_model(
-                layout_model_config_path, layout_model_ckpt_path
-            )
 
             # Load conditioner embedder so that we only load it once
             ss_condition_embedder = self.init_ss_condition_embedder(
@@ -182,14 +159,10 @@ class InferencePipeline:
             slat_condition_embedder = self.init_slat_condition_embedder(
                 slat_generator_config_path, slat_generator_ckpt_path
             )
-            layout_condition_embedder = self.init_layout_condition_embedder(
-                layout_model_config_path, layout_model_ckpt_path
-            )
 
             self.condition_embedders = {
                 "ss_condition_embedder": ss_condition_embedder,
                 "slat_condition_embedder": slat_condition_embedder,
-                "layout_condition_embedder": layout_condition_embedder,
             }
 
             # override generator and condition embedder setting
@@ -208,14 +181,6 @@ class InferencePipeline:
                 rescale_t=slat_rescale_t,
                 cfg_interval=slat_cfg_interval,
             )
-            self.override_layout_model_cfg_config(
-                layout_model,
-                cfg_strength=ss_cfg_strength,
-                inference_steps=ss_inference_steps,
-                rescale_t=ss_rescale_t,
-                cfg_interval=ss_cfg_interval,
-                cfg_strength_pm=ss_cfg_strength_pm,
-            )
 
             self.models = torch.nn.ModuleDict(
                 {
@@ -226,11 +191,9 @@ class InferencePipeline:
                     "slat_decoder_gs": slat_decoder_gs,
                     "slat_decoder_gs_4": slat_decoder_gs_4,
                     "slat_decoder_mesh": slat_decoder_mesh,
-                    "layout_model": layout_model,
                 }
             )
             logger.info("Loading model weights completed!")
-            self.use_layout_result = use_layout_result
 
             if self.compile_model:
                 logger.info("Compiling model...")
@@ -271,15 +234,6 @@ class InferencePipeline:
             )
         )
 
-        if self.models["layout_model"] is not None:
-            self.models["layout_model"].reverse_fn.inner_forward = clone_output_wrapper(
-                torch.compile(
-                    self.models["layout_model"].reverse_fn.inner_forward,
-                    mode=compile_mode,
-                    fullgraph=True,
-                )
-            )
-
         self.models["ss_decoder"].forward = clone_output_wrapper(
             torch.compile(
                 self.models["ss_decoder"].forward,
@@ -304,21 +258,13 @@ class InferencePipeline:
             coords = ss_return_dict["coords"]
             slat = self.sample_slat(slat_input_dict, coords)
 
-            if "layout_model" in self.models:
-                layout_input_dict = self.preprocess_image(
-                    image, self.layout_preprocessor
-                )
-                layout_output_dict = self.run_layout_model(
-                    layout_input_dict, ss_return_dict
-                )
-
     def instantiate_and_load_from_pretrained(
         self,
         config,
         ckpt_path,
         state_dict_fn=None,
         state_dict_key="state_dict",
-        device="cuda",  # TODO(Pierre) : Should default to "cpu", but leaving "cuda" as default for backward compatibility
+        device="cuda", 
     ):
         model = instantiate(config)
 
@@ -355,23 +301,14 @@ class InferencePipeline:
         config = OmegaConf.load(os.path.join(self.workspace_dir, ss_generator_config_path))["tdfy"]["val_preprocessor"]
         return instantiate(config)
 
-
     def init_ss_generator(self, ss_generator_config_path, ss_generator_ckpt_path):
         config = OmegaConf.load(
             os.path.join(self.workspace_dir, ss_generator_config_path)
         )["module"]["generator"]["backbone"]
 
-        # Override with PointmapCFG if ss_cfg_strength_pm is not None
-        if isinstance(self.ss_cfg_strength_pm, dict) or (self.ss_cfg_strength_pm is not None and self.ss_cfg_strength_pm > 0.0):
-            logger.info(f"Using PointmapCFG with strength_pm: {self.ss_cfg_strength_pm}")
-            config['reverse_fn']['_target_'] = 'sam3d_objects.model.backbone.generator.classifier_free_guidance.PointmapCFG'
-        
-        if self.use_pretrained_ss:
-            state_dict_prefix_func = add_prefix_state_dict_fn("reverse_fn.backbone.")
-        else:
-            state_dict_prefix_func = filter_and_remove_prefix_state_dict_fn(
-                "_base_models.generator."
-            )
+        state_dict_prefix_func = filter_and_remove_prefix_state_dict_fn(
+            "_base_models.generator."
+        )
 
         return self.instantiate_and_load_from_pretrained(
             config,
@@ -384,12 +321,9 @@ class InferencePipeline:
         config = OmegaConf.load(
             os.path.join(self.workspace_dir, slat_generator_config_path)
         )["module"]["generator"]["backbone"]
-        if self.use_pretrained_slat:
-            state_dict_prefix_func = add_prefix_state_dict_fn("reverse_fn.backbone.")
-        else:
-            state_dict_prefix_func = filter_and_remove_prefix_state_dict_fn(
-                "_base_models.generator."
-            )
+        state_dict_prefix_func = filter_and_remove_prefix_state_dict_fn(
+            "_base_models.generator."
+        )
         return self.instantiate_and_load_from_pretrained(
             config,
             os.path.join(self.workspace_dir, slat_generator_ckpt_path),
@@ -455,29 +389,6 @@ class InferencePipeline:
             state_dict_key=None,
         )
 
-    def init_layout_model(self, layout_model_config_path, layout_model_ckpt_path):
-        if layout_model_config_path is not None:
-            assert layout_model_ckpt_path is not None
-            hydra_config = OmegaConf.load(
-                os.path.join(self.workspace_dir, layout_model_config_path)
-            )["module"]["generator"]["backbone"]
-            if self.force_shape_in_layout:
-                hydra_config["_target_"] = (
-                    "sam3d_objects.model.backbone.generator.flow_matching.model.ConditionalFlowMatching"
-                )
-            layout_model = self.instantiate_and_load_from_pretrained(
-                hydra_config,
-                os.path.join(self.workspace_dir, layout_model_ckpt_path),
-                device=self.device,
-                state_dict_fn=filter_and_remove_prefix_state_dict_fn(
-                    "_base_models.generator."
-                ),
-            )
-        else:
-            layout_model = None
-
-        return layout_model
-
     def init_ss_condition_embedder(
         self, ss_generator_config_path, ss_generator_ckpt_path
     ):
@@ -503,16 +414,6 @@ class InferencePipeline:
             slat_generator_config_path, slat_generator_ckpt_path
         )
 
-    def init_layout_condition_embedder(
-        self, layout_model_config_path, layout_model_ckpt_path
-    ):
-        if layout_model_config_path is not None:
-            assert layout_model_ckpt_path is not None
-            return self.init_ss_condition_embedder(
-                layout_model_config_path, layout_model_ckpt_path
-            )
-        else:
-            return None
 
     def override_ss_generator_cfg_config(
         self,
@@ -552,11 +453,7 @@ class InferencePipeline:
         slat_generator.inference_steps = inference_steps
         slat_generator.reverse_fn.strength = cfg_strength
         slat_generator.reverse_fn.interval = cfg_interval
-        slat_generator.reverse_fn.backbone.condition_embedder.normalize_images = True
-        slat_generator.reverse_fn.backbone.force_zeros_cond = True
         slat_generator.rescale_t = rescale_t
-        slat_generator.reverse_fn.backbone.condition_embedder.prenorm_features = True
-        slat_generator.reverse_fn.unconditional_handling = "add_flag"
 
         logger.info(
             "slat_generator parameters: inference_steps={}, cfg_strength={}, cfg_interval={}, rescale_t={}",
@@ -566,40 +463,6 @@ class InferencePipeline:
             rescale_t,
         )
 
-        # For pretrained Trellis
-        if self.use_pretrained_slat:
-            slat_generator.reversed_timestamp = True
-            slat_generator.reverse_fn.backbone.condition_embedder.prenorm_features = (
-                True
-            )
-            slat_generator.reverse_fn.interval = [500, 1000]
-
-            if (
-                "slat_condition_embedder" in self.condition_embedders
-                and self.condition_embedders["slat_condition_embedder"] is not None
-            ):
-                self.condition_embedders["slat_condition_embedder"].prenorm_features = (
-                    True
-                )
-
-    def override_layout_model_cfg_config(
-        self,
-        layout_model,
-        cfg_strength=7,
-        inference_steps=25,
-        rescale_t=3,
-        cfg_interval=[0, 500],
-        cfg_strength_pm=0.0,
-    ):
-        if layout_model is not None:
-            self.override_ss_generator_cfg_config(
-                layout_model,
-                cfg_strength=cfg_strength,
-                inference_steps=inference_steps,
-                rescale_t=rescale_t,
-                cfg_interval=cfg_interval,
-                cfg_strength_pm=cfg_strength_pm,
-            )
 
     def run(
         self,
@@ -628,9 +491,8 @@ class InferencePipeline:
         """
         # This should only happen if called from demo
         image = self.merge_image_and_mask(image, mask)
-        with self.device:  # TODO(Pierre) make with context a decorator ?
+        with self.device:
             ss_input_dict = self.preprocess_image(image, self.ss_preprocessor)
-            layout_input_dict = self.preprocess_image(image, self.layout_preprocessor)
             slat_input_dict = self.preprocess_image(image, self.slat_preprocessor)
             torch.manual_seed(seed)
             ss_return_dict = self.sample_sparse_structure(
@@ -639,15 +501,6 @@ class InferencePipeline:
                 use_distillation=use_stage1_distillation,
             )
 
-            # This is for decoupling oriented shape and layout model
-            # ss_input_dict["x_shape_latent"] = ss_return_dict["shape"]
-            layout_return_dict = self.run_layout_model(
-                layout_input_dict,
-                ss_return_dict,
-                inference_steps=stage1_inference_steps,
-                use_distillation=use_stage1_distillation,
-            )
-            ss_return_dict.update(layout_return_dict)
             ss_return_dict.update(self.pose_decoder(ss_return_dict))
 
             if "scale" in ss_return_dict:
@@ -750,8 +603,6 @@ class InferencePipeline:
         """
         logger.info("Decoding sparse latent...")
         ret = {}
-        # with torch.autocast(device_type="cuda", dtype=self.dtype):
-        # TODO: need to update flexicubes to make it fp16 compatible. The update is only local so disable fp16 for the decoder for now
         with torch.no_grad():
             if "mesh" in formats:
                 ret["mesh"] = self.models["slat_decoder_mesh"](slat)
@@ -863,108 +714,6 @@ class InferencePipeline:
                 )
                 return_dict["coords"] = coords
                 return_dict["downsample_factor"] = downsample_factor
-
-        ss_generator.inference_steps = prev_inference_steps
-        return return_dict
-
-    def run_layout_model(
-        self,
-        ss_input_dict: dict,
-        ss_return_dict: dict,
-        inference_steps=None,
-        use_distillation=False,
-    ):
-        if self.models["layout_model"] is None:
-            return {}
-        ss_generator = self.models["layout_model"]
-        prev_inference_steps = ss_generator.inference_steps
-        if inference_steps:
-            ss_generator.inference_steps = inference_steps
-        if use_distillation:
-            ss_generator.no_shortcut = False
-            ss_generator.reverse_fn.strength = 0
-        else:
-            ss_generator.no_shortcut = True
-            ss_generator.reverse_fn.strength = self.ss_cfg_strength
-
-        logger.info(
-            "Sampling layout model: inference_steps={}, strength={}, interval={}, rescale_t={}",
-            ss_generator.inference_steps,
-            ss_generator.reverse_fn.strength,
-            ss_generator.reverse_fn.interval,
-            ss_generator.rescale_t,
-        )
-
-        image = ss_input_dict["image"]
-        bs = image.shape[0]
-
-        with torch.no_grad():
-            with torch.autocast(device_type="cuda", dtype=self.layout_model_dtype):
-                if self.is_mm_dit("layout_model"):
-                    latent_shape_dict = {
-                        k: (bs,) + (v.pos_emb.shape[0], v.input_layer.in_features)
-                        for k, v in ss_generator.reverse_fn.backbone.latent_mapping.items()
-                    }
-                else:
-                    latent_shape_dict = (bs,) + (4096, 8)
-
-                condition_args, condition_kwargs = self.get_condition_input(
-                    self.condition_embedders["layout_condition_embedder"],
-                    ss_input_dict,
-                    self.layout_condition_input_mapping,
-                )
-                if self.force_shape_in_layout:
-                    logger.info("Forcing shape in layout model.")
-                    if self.models["ss_encoder"] is None:
-                        condition_kwargs["noise_override"] = {
-                            "shape": ss_return_dict["shape"],
-                        }
-                    else:
-                        # In case the VAE is different for two models
-                        logger.info("Re-encode shape ...")
-                        coords = ss_return_dict["coords"]
-                        ss = torch.zeros(1, 1, 64, 64, 64, dtype=torch.long).to(
-                            coords.device
-                        )
-                        ss[:, :, coords[:, 1], coords[:, 2], coords[:, 3]] = 1
-                        encoded_shape = (
-                            self.models["ss_encoder"](ss)["mean"]
-                            .view(ss_return_dict["shape"].shape[0], 8, -1)
-                            .permute(0, 2, 1)
-                            .contiguous()
-                        )
-                        condition_kwargs["noise_override"] = {
-                            "shape": encoded_shape,
-                        }
-
-                return_dict = ss_generator(
-                    latent_shape_dict,
-                    image.device,
-                    *condition_args,
-                    **condition_kwargs,
-                )
-                if not self.is_mm_dit("layout_model"):
-                    return_dict = {"shape": return_dict}
-
-        if not self.use_layout_result:
-            return_dict.pop("shape")
-            if "quaternion" in return_dict:
-                return_dict.pop("quaternion")
-            if "6drotation_normalized" in return_dict:
-                return_dict.pop("6drotation_normalized")
-            if "6drotation" in return_dict:
-                return_dict.pop("6drotation")
-            if "rotation" in return_dict:
-                return_dict.pop("rotation")
-        else:
-            if "quaternion" in ss_return_dict:
-                ss_return_dict.pop("quaternion")
-            if "6drotation_normalized" in ss_return_dict:
-                ss_return_dict.pop("6drotation_normalized")
-            if "6drotation" in ss_return_dict:
-                ss_return_dict.pop("6drotation")
-            if "rotation" in ss_return_dict:
-                ss_return_dict.pop("rotation")
 
         ss_generator.inference_steps = prev_inference_steps
         return return_dict

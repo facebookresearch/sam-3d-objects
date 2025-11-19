@@ -15,8 +15,6 @@ from glob import glob
 from sam3d_objects.data.utils import get_child, set_child
 
 
-# TODO(Pierre) : Make a version working as a "state_dict_fn" filter ?
-# rename
 def rename_checkpoint_weights_using_suffix_matching(
     checkpoint_path_in,
     checkpoint_path_out,

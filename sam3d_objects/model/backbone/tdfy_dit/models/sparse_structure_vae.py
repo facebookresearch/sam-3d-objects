@@ -256,8 +256,6 @@ class SparseStructureDecoder(nn.Module):
         self.num_res_blocks_middle = num_res_blocks_middle
         self.norm_type = norm_type
         self.use_fp16 = use_fp16
-        # TODO(Hao): this is weird need to double check. The model weights use
-        # torch.float16 in .modules.utils.FP16_TYPE. This is to be compatible with that.
         self.dtype = torch.float16 if use_fp16 else torch.float32
         self.reshape_input_to_cube = reshape_input_to_cube
         self.input_layer = nn.Conv3d(latent_channels, channels[0], 3, padding=1)

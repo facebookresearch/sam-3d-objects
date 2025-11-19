@@ -99,8 +99,6 @@ def expand_as_right(tensor, target):
     return expand_right(tensor, target.shape)
 
 
-# TODO(Pierre) : make a better mapping features (using optree's accessors >?)
-# <
 def as_keys(path: ChildPathType):
     if isinstance(path, Iterable) and (not isinstance(path, str)):
         return tuple(path)

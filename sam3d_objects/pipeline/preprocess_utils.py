@@ -7,7 +7,7 @@ from functools import partial
 from PIL import Image
 
 
-from sam3d_objects.data.dataset.tdfy.trellis.dataset import PreProcessor
+from sam3d_objects.data.dataset.tdfy.preprocessor import PreProcessor
 from torchvision.transforms import Compose, Resize, InterpolationMode
 from sam3d_objects.data.dataset.tdfy.img_processing import pad_to_square_centered
 from sam3d_objects.data.dataset.tdfy.img_and_mask_transforms import (

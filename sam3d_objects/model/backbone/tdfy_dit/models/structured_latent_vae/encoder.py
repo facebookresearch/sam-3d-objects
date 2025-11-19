@@ -86,7 +86,6 @@ class SLatEncoderTdfyWrapper(SLatEncoder):
             logger.info(
                 f"Loading pretrained slat decoder gs from {pretrained_ckpt_path}"
             )
-            # self.load_state_dict(load_file(pretrained_ckpt_path)) TODO(Hao): not only load safetensor, but also torch file (Bowen): We have enabled loading both safetensors and torch files based on the file extension.
             file_type = os.path.splitext(pretrained_ckpt_path)[1]
             if file_type == '.safetensors':    
                 self.load_state_dict(load_file(pretrained_ckpt_path))

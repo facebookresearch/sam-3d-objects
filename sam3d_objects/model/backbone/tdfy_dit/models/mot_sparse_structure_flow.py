@@ -213,7 +213,6 @@ class SparseStructureFlowTdfyWrapper(SparseStructureFlowModel):
             
         cfg_activate = condition_kwargs.pop("cfg", False)
         if self.force_zeros_cond and cfg_activate:
-            # TODO: @weiyaowang, refactor to read directly from embedder
             cond = self.condition_embedder(*condition_args, **condition_kwargs)
             cond = cond * 0
         else:

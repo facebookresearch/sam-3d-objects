@@ -197,5 +197,4 @@ class SLatMeshDecoderTdfyWrapper(SLatMeshDecoder):
             logger.info(
                 f"Loading pretrained slat decoder gs from {pretrained_ckpt_path}"
             )
-            # TODO(Hao): not only load safetensor, but also torch file
             self.load_state_dict(load_file(pretrained_ckpt_path))

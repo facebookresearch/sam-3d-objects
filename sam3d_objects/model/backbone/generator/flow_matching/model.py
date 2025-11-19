@@ -158,7 +158,6 @@ class FlowMatching(Base):
     def loss(self, x1: torch.Tensor, *args_conditionals, **kwargs_conditionals):
         t = self._generate_t(x1)
         x0 = self._generate_x0(x1)
-        # TODO: Add coupling here for OT flow
         x_t = self._generate_xt(x0, x1, t)
         target = self._generate_target(x0, x1)
 
