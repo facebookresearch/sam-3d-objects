@@ -139,4 +139,14 @@ Yael Yungster
 
 If you use SAM 3D Objects in your research, please use the following BibTeX entry.
 
-< TODO: Add bibtex here >
+```
+@article{sam3dteam2025sam3d3dfyimages,
+      title={SAM 3D: 3Dfy Anything in Images}, 
+      author={SAM 3D Team and Xingyu Chen and Fu-Jen Chu and Pierre Gleize and Kevin J Liang and Alexander Sax and Hao Tang and Weiyao Wang and Michelle Guo and Thibaut Hardin and Xiang Li and Aohan Lin and Jiawei Liu and Ziqi Ma and Anushka Sagar and Bowen Song and Xiaodong Wang and Jianing Yang and Bowen Zhang and Piotr Dollár and Georgia Gkioxari and Matt Feiszli and Jitendra Malik},
+      year={2025},
+      eprint={2511.16624},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2511.16624}, 
+}
+```
