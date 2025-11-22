@@ -18,6 +18,19 @@ from .render_utils import render_multiview
 from ..renderers import GaussianRenderer
 from ..representations import Strivec, Gaussian, MeshExtractResult
 from loguru import logger
+from dataclasses import dataclass
+from typing import Optional
+import os
+from pathlib import Path
+
+
+@dataclass
+class MeshExportData:
+    vertices: np.ndarray  # (V, 3)
+    faces: np.ndarray  # (F, 3)
+    uvs: Optional[np.ndarray] = None  # (V, 2) or (F*3, 2) depending on source
+    texture: Optional[Image.Image] = None  # PIL image if baked
+    vertex_colors: Optional[np.ndarray] = None  # (V, 3) in [0, 1]
 
 @torch.no_grad()
 def _fill_holes(
@@ -595,7 +608,8 @@ def to_glb(
     with_texture_baking=True,
     use_vertex_color=False,
     rendering_engine: str = "nvdiffrast",  # nvdiffrast OR "pytorch3d"
-) -> trimesh.Trimesh:
+    return_export_data: bool = False,
+) -> Union[trimesh.Trimesh, tuple[trimesh.Trimesh, MeshExportData]]:
     """
     Convert a generated asset to a glb file.
 
@@ -629,6 +643,7 @@ def to_glb(
             verbose=verbose,
         )
 
+    baked_texture = None
     if with_texture_baking:
         # parametrize mesh
         vertices, faces, uvs = parametrize_mesh(vertices, faces)
@@ -655,10 +670,10 @@ def to_glb(
             verbose=verbose,
             rendering_engine=rendering_engine
         )
-        texture = Image.fromarray(texture)
+        baked_texture = Image.fromarray(texture)
         material = trimesh.visual.material.PBRMaterial(
             roughnessFactor=1.0,
-            baseColorTexture=texture,
+            baseColorTexture=baked_texture,
             baseColorFactor=np.array([255, 255, 255, 255], dtype=np.uint8),
         )
 
@@ -679,7 +694,154 @@ def to_glb(
             ),
         )
 
+    if return_export_data:
+        export_data = MeshExportData(
+            vertices=vertices,
+            faces=faces,
+            uvs=uvs if with_texture_baking else None,
+            texture=baked_texture,
+            vertex_colors=vert_colors if use_vertex_color else None,
+        )
+        return mesh, export_data
+
     return mesh
+
+
+def _require_usd():
+    try:
+        from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf  # type: ignore
+    except ImportError as e:
+        raise ImportError(
+            "USD export requires the 'pxr' package (e.g. `pip install usd-core`)."
+        ) from e
+    return Usd, UsdGeom, UsdShade, Sdf, Gf
+
+
+def to_usd(
+    export_data: MeshExportData,
+    path: str,
+    embed_textures: bool = True,
+    scale_factor: float = 100.0,
+):
+    """
+    Export mesh (with optional texture or vertex colors) to USD.
+    Args:
+        export_data: MeshExportData produced by to_glb(return_export_data=True).
+        path: Output USD file path.
+        embed_textures: Write a sibling PNG and wire it as a diffuse texture if available.
+        scale_factor: Uniform scale applied to vertex positions before export.
+    """
+    Usd, UsdGeom, UsdShade, Sdf, Gf = _require_usd()
+
+    stage = Usd.Stage.CreateNew(path)
+    stage.SetStartTimeCode(0)
+    stage.SetEndTimeCode(0)
+    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+
+    mesh_prim = UsdGeom.Mesh.Define(stage, "/Mesh")
+    vertices = export_data.vertices
+    faces = export_data.faces.astype(np.int32)
+    mesh_prim.GetSubdivisionSchemeAttr().Set(UsdGeom.Tokens.none)
+    mesh_prim.CreateDoubleSidedAttr(True)
+    mesh_prim.CreatePointsAttr(
+        [
+            Gf.Vec3f(
+                float(v[0]) * scale_factor,
+                float(v[1]) * scale_factor,
+                float(v[2]) * scale_factor,
+            )
+            for v in vertices
+        ]
+    )
+    mesh_prim.CreateFaceVertexCountsAttr([3] * faces.shape[0])
+    mesh_prim.CreateFaceVertexIndicesAttr(faces.reshape(-1).tolist())
+
+    primvars_api = UsdGeom.PrimvarsAPI(mesh_prim)
+
+    if export_data.uvs is not None:
+        # USD wants face-varying UVs; expand vertex UVs if needed.
+        if export_data.uvs.shape[0] == vertices.shape[0]:
+            face_uvs = []
+            for face in faces:
+                for vi in face:
+                    face_uvs.append(export_data.uvs[vi])
+        else:
+            face_uvs = export_data.uvs
+        st = primvars_api.CreatePrimvar(
+            "st",
+            Sdf.ValueTypeNames.TexCoord2fArray,
+            UsdGeom.Tokens.faceVarying,
+        )
+        st.Set([Gf.Vec2f(float(uv[0]), float(uv[1])) for uv in face_uvs])
+
+    if export_data.vertex_colors is not None:
+        colors = [
+            Gf.Vec3f(float(c[0]), float(c[1]), float(c[2]))
+            for c in export_data.vertex_colors
+        ]
+        color_primvar = primvars_api.CreatePrimvar(
+            "displayColor", Sdf.ValueTypeNames.Color3fArray, UsdGeom.Tokens.vertex
+        )
+        color_primvar.Set(colors)
+
+    if embed_textures and export_data.texture is not None and export_data.uvs is not None:
+        tex_path = Path(path).with_suffix("").as_posix() + "_albedo.png"
+        export_data.texture.save(tex_path)
+        rel_tex_path = os.path.relpath(tex_path, Path(path).parent)
+
+        material = UsdShade.Material.Define(stage, "/Material")
+        shader = UsdShade.Shader.Define(stage, "/Material/PBRShader")
+        shader.CreateIdAttr("UsdPreviewSurface")
+        shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.5)
+        shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.0)
+
+        tex_shader = UsdShade.Shader.Define(stage, "/Material/Texture")
+        tex_shader.CreateIdAttr("UsdUVTexture")
+        tex_shader.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(rel_tex_path)
+        tex_shader.CreateInput("sourceColorSpace", Sdf.ValueTypeNames.Token).Set("sRGB")
+        tex_shader_output = tex_shader.CreateOutput("rgb", Sdf.ValueTypeNames.Float3)
+
+        if primvars_api.HasPrimvar("st"):
+            # Create a PrimvarReader to feed UVs to the texture shader.
+            primvar_reader = UsdShade.Shader.Define(stage, "/Material/PrimvarStReader")
+            primvar_reader.CreateIdAttr("UsdPrimvarReader_float2")
+            primvar_reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
+            primvar_output = primvar_reader.CreateOutput("result", Sdf.ValueTypeNames.Float2)
+
+            st_input = tex_shader.CreateInput("st", Sdf.ValueTypeNames.Float2)
+            st_input.ConnectToSource(primvar_output)
+        else:
+            tex_shader.CreateInput("st", Sdf.ValueTypeNames.Float2).Set(Gf.Vec2f(0.0, 0.0))
+
+        shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(tex_shader_output)
+
+        shader_surface = shader.CreateOutput("surface", Sdf.ValueTypeNames.Token)
+        material.CreateSurfaceOutput().ConnectToSource(shader_surface)
+        UsdShade.MaterialBindingAPI(mesh_prim).Bind(material)
+
+    stage.GetRootLayer().Save()
+
+
+def to_usdz(archive_path: str, usd_path: str, first_layer_name: str = "", edit_in_place: bool = False):
+    """
+    Package a USD and its asset files into a single USDZ archive.
+
+    Note: USDZ in pxr requires a single root USD; assets referenced by relative
+    paths are pulled in automatically.
+    """
+    try:
+        from pxr import UsdUtils, Sdf  # type: ignore
+    except ImportError as e:
+        raise ImportError(
+            "USDZ export requires the 'pxr' package (e.g. `pip install usd-core`)."
+        ) from e
+
+    UsdUtils.CreateNewUsdzPackage(
+        Sdf.AssetPath(str(usd_path)),
+        str(archive_path),
+        first_layer_name,
+        edit_in_place,
+    )
 
 
 def simplify_gs(
