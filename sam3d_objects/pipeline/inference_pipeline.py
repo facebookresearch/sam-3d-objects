@@ -20,7 +20,7 @@ def set_attention_backend():
 
 set_attention_backend()
 
-from typing import List, Union
+from typing import List, Union, Optional, Literal
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import numpy as np
@@ -842,3 +842,393 @@ class InferencePipeline:
             return torch.float32
         else:
             raise NotImplementedError
+
+    def get_multi_view_condition_input(
+        self, 
+        condition_embedder, 
+        view_input_dicts: List[dict], 
+        input_mapping
+    ):
+        """
+        为多视角输入准备条件
+        
+        Args:
+            condition_embedder: 条件嵌入器
+            view_input_dicts: 每个视角的输入字典列表
+            input_mapping: 输入映射
+            
+        Returns:
+            condition_args: 条件参数（包含所有视角的条件tokens）
+            condition_kwargs: 条件关键字参数
+        """
+        # 对每个视角分别提取条件
+        view_conditions = []
+        for view_input_dict in view_input_dicts:
+            condition_args = self.map_input_keys(view_input_dict, input_mapping)
+            condition_kwargs = {
+                k: v for k, v in view_input_dict.items() if k not in input_mapping
+            }
+            embedded_cond, _, _ = self.embed_condition(
+                condition_embedder, *condition_args, **condition_kwargs
+            )
+            if embedded_cond is not None:
+                view_conditions.append(embedded_cond)
+            else:
+                # 如果没有嵌入，使用原始参数
+                view_conditions.append(condition_args)
+        
+        # 将所有视角的条件堆叠在一起
+        # 形状: (num_views, batch_size, num_tokens, dim)
+        if isinstance(view_conditions[0], torch.Tensor):
+            # 如果是tensor，堆叠
+            all_conditions = torch.stack(view_conditions, dim=0)
+        else:
+            # 如果是其他类型，保持为列表
+            all_conditions = view_conditions
+        
+        return (all_conditions,), {}
+
+    def sample_sparse_structure_multi_view(
+        self, 
+        view_ss_input_dicts: List[dict], 
+        inference_steps=None, 
+        use_distillation=False,
+        mode: Literal['stochastic', 'multidiffusion'] = 'multidiffusion',
+    ):
+        """
+        多视角稀疏结构生成
+        
+        Args:
+            view_ss_input_dicts: 每个视角的输入字典列表
+            inference_steps: 推理步数
+            use_distillation: 是否使用蒸馏
+            mode: 'stochastic' 或 'multidiffusion'
+        """
+        from sam3d_objects.pipeline.multi_view_utils import inject_generator_multi_view
+        
+        ss_generator = self.models["ss_generator"]
+        ss_decoder = self.models["ss_decoder"]
+        num_views = len(view_ss_input_dicts)
+        
+        if use_distillation:
+            ss_generator.no_shortcut = False
+            ss_generator.reverse_fn.strength = 0
+            ss_generator.reverse_fn.strength_pm = 0
+        else:
+            ss_generator.no_shortcut = True
+            ss_generator.reverse_fn.strength = self.ss_cfg_strength
+            ss_generator.reverse_fn.strength_pm = self.ss_cfg_strength_pm
+
+        prev_inference_steps = ss_generator.inference_steps
+        if inference_steps:
+            ss_generator.inference_steps = inference_steps
+
+        image = view_ss_input_dicts[0]["image"]
+        bs = image.shape[0]
+        logger.info(
+            f"Sampling sparse structure with {num_views} views: "
+            f"inference_steps={ss_generator.inference_steps}, mode={mode}"
+        )
+
+        with torch.no_grad():
+            with torch.autocast(device_type="cuda", dtype=self.shape_model_dtype):
+                if self.is_mm_dit():
+                    latent_shape_dict = {
+                        k: (bs,) + (v.pos_emb.shape[0], v.input_layer.in_features)
+                        for k, v in ss_generator.reverse_fn.backbone.latent_mapping.items()
+                    }
+                    logger.info(f"[Stage 1] Latent shape (MM-DiT): {latent_shape_dict}")
+                else:
+                    latent_shape_dict = (bs,) + (4096, 8)
+                    logger.info(f"[Stage 1] Latent shape: {latent_shape_dict}")
+
+                # 准备多视角条件
+                condition_args, condition_kwargs = self.get_multi_view_condition_input(
+                    self.condition_embedders["ss_condition_embedder"],
+                    view_ss_input_dicts,
+                    self.ss_condition_input_mapping,
+                )
+                
+                # 注入多视角支持
+                with inject_generator_multi_view(
+                    ss_generator, 
+                    num_views=num_views, 
+                    num_steps=ss_generator.inference_steps,
+                    mode=mode
+                ):
+                    return_dict = ss_generator(
+                        latent_shape_dict,
+                        image.device,
+                        *condition_args,
+                        **condition_kwargs,
+                    )
+                
+                if not self.is_mm_dit():
+                    return_dict = {"shape": return_dict}
+
+                shape_latent = return_dict["shape"]
+                logger.info(f"[Stage 1 Multi-view] Generated shape_latent shape: {shape_latent.shape}")
+                ss = ss_decoder(
+                    shape_latent.permute(0, 2, 1)
+                    .contiguous()
+                    .view(shape_latent.shape[0], 8, 16, 16, 16)
+                )
+                logger.info(f"[Stage 1 Multi-view] Decoded sparse structure shape: {ss.shape}")
+                coords = torch.argwhere(ss > 0)[:, [0, 2, 3, 4]].int()
+                logger.info(f"[Stage 1 Multi-view] Extracted coords shape: {coords.shape}")
+
+                # downsample output
+                return_dict["coords_original"] = coords
+                original_shape = coords.shape
+                if self.downsample_ss_dist > 0:
+                    coords = prune_sparse_structure(
+                        coords,
+                        max_neighbor_axes_dist=self.downsample_ss_dist,
+                    )
+                coords, downsample_factor = downsample_sparse_structure(coords)
+                logger.info(
+                    f"[Stage 1 Multi-view] Downsampled coords from {original_shape[0]} to {coords.shape[0]}"
+                )
+                return_dict["coords"] = coords
+                return_dict["downsample_factor"] = downsample_factor
+
+        ss_generator.inference_steps = prev_inference_steps
+        return return_dict
+
+    def sample_slat_multi_view(
+        self,
+        view_slat_input_dicts: List[dict],
+        coords: torch.Tensor,
+        inference_steps=25,
+        use_distillation=False,
+        mode: Literal['stochastic', 'multidiffusion'] = 'multidiffusion',
+    ) -> sp.SparseTensor:
+        """
+        多视角结构化潜在生成
+        
+        Args:
+            view_slat_input_dicts: 每个视角的输入字典列表
+            coords: 坐标（从Stage 1得到）
+            inference_steps: 推理步数
+            use_distillation: 是否使用蒸馏
+            mode: 'stochastic' 或 'multidiffusion'
+        """
+        from sam3d_objects.pipeline.multi_view_utils import inject_generator_multi_view
+        
+        image = view_slat_input_dicts[0]["image"]
+        DEVICE = image.device
+        slat_generator = self.models["slat_generator"]
+        num_views = len(view_slat_input_dicts)
+        latent_shape = (image.shape[0],) + (coords.shape[0], 8)
+        logger.info(f"[Stage 2] Coords shape: {coords.shape}")
+        logger.info(f"[Stage 2] Latent shape: {latent_shape}")
+        prev_inference_steps = slat_generator.inference_steps
+        if inference_steps:
+            slat_generator.inference_steps = inference_steps
+        if use_distillation:
+            slat_generator.no_shortcut = False
+            slat_generator.reverse_fn.strength = 0
+        else:
+            slat_generator.no_shortcut = True
+            slat_generator.reverse_fn.strength = self.slat_cfg_strength
+
+        logger.info(
+            f"Sampling sparse latent with {num_views} views: "
+            f"inference_steps={slat_generator.inference_steps}, mode={mode}"
+        )
+
+        with torch.autocast(device_type="cuda", dtype=self.dtype):
+            with torch.no_grad():
+                # 准备多视角条件
+                condition_args, condition_kwargs = self.get_multi_view_condition_input(
+                    self.condition_embedders["slat_condition_embedder"],
+                    view_slat_input_dicts,
+                    self.slat_condition_input_mapping,
+                )
+                condition_args += (coords.cpu().numpy(),)
+                
+                # 注入多视角支持
+                with inject_generator_multi_view(
+                    slat_generator,
+                    num_views=num_views,
+                    num_steps=slat_generator.inference_steps,
+                    mode=mode
+                ):
+                    slat = slat_generator(
+                        latent_shape, DEVICE, *condition_args, **condition_kwargs
+                    )
+                
+                logger.info(f"[Stage 2] Generated slat shape (before SparseTensor): {slat[0].shape if isinstance(slat, (list, tuple)) else slat.shape}")
+                slat = sp.SparseTensor(
+                    coords=coords,
+                    feats=slat[0],
+                ).to(DEVICE)
+                slat = slat * self.slat_std.to(DEVICE) + self.slat_mean.to(DEVICE)
+                logger.info(f"[Stage 2] Final slat: coords={slat.coords.shape}, feats={slat.feats.shape}")
+
+        slat_generator.inference_steps = prev_inference_steps
+        return slat
+
+    def run_multi_view(
+        self,
+        view_images: List[Union[np.ndarray, Image.Image]],
+        view_masks: List[Optional[Union[None, np.ndarray, Image.Image]]] = None,
+        num_samples: int = 1,
+        seed: Optional[int] = None,
+        stage1_inference_steps: Optional[int] = None,
+        stage2_inference_steps: Optional[int] = None,
+        use_stage1_distillation: bool = False,
+        use_stage2_distillation: bool = False,
+        decode_formats: Optional[List[str]] = None,
+        with_mesh_postprocess: bool = True,
+        with_texture_baking: bool = True,
+        use_vertex_color: bool = False,
+        stage1_only: bool = False,
+        mode: Literal['stochastic', 'multidiffusion'] = 'multidiffusion',
+    ) -> dict:
+        """
+        多视角推理主函数
+        
+        Args:
+            view_images: 每个视角的图像列表
+            view_masks: 每个视角的掩码列表（可选）
+            num_samples: 生成样本数
+            seed: 随机种子
+            stage1_inference_steps: Stage 1推理步数
+            stage2_inference_steps: Stage 2推理步数
+            use_stage1_distillation: 是否使用Stage 1蒸馏
+            use_stage2_distillation: 是否使用Stage 2蒸馏
+            decode_formats: 解码格式
+            with_mesh_postprocess: 是否进行网格后处理
+            with_texture_baking: 是否进行纹理烘焙
+            use_vertex_color: 是否使用顶点颜色
+            stage1_only: 是否只运行Stage 1
+            mode: 'stochastic' 或 'multidiffusion'
+        """
+        num_views = len(view_images)
+        if view_masks is None:
+            view_masks = [None] * num_views
+        assert len(view_masks) == num_views, "Number of masks must match number of images"
+        
+        if seed is not None:
+            torch.manual_seed(seed)
+        
+        logger.info(f"Running multi-view inference with {num_views} views, mode={mode}")
+        
+        # 预处理每个视角
+        # 注意：需要先将mask合并到图像的alpha通道，然后调用preprocess_image
+        view_ss_input_dicts = []
+        view_slat_input_dicts = []
+        for i, (image, mask) in enumerate(zip(view_images, view_masks)):
+            logger.info(f"Preprocessing view {i+1}/{num_views}")
+            
+            # 将mask合并到图像的alpha通道（RGBA格式）
+            # 如果image已经是RGBA格式（从mask的alpha通道加载），mask可能是None
+            if mask is not None:
+                # 确保image是numpy数组
+                if isinstance(image, Image.Image):
+                    image = np.array(image)
+                else:
+                    image = np.array(image)
+                
+                # 确保mask是numpy数组
+                mask = np.array(mask)
+                
+                # 如果mask是bool类型，转换为uint8
+                if mask.dtype == bool:
+                    mask = mask.astype(np.uint8) * 255
+                elif mask.dtype != np.uint8:
+                    # 如果mask是0-1范围的float，转换为0-255
+                    if mask.max() <= 1.0:
+                        mask = (mask * 255).astype(np.uint8)
+                    else:
+                        mask = mask.astype(np.uint8)
+                
+                if mask.ndim == 2:
+                    mask = mask[..., None]
+                
+                # 合并mask到alpha通道
+                if image.shape[-1] == 3:  # RGB
+                    rgba_image = np.concatenate([image, mask], axis=-1).astype(np.uint8)
+                elif image.shape[-1] == 4:  # 已经是RGBA，替换alpha通道
+                    rgba_image = np.concatenate([image[..., :3], mask], axis=-1).astype(np.uint8)
+                else:
+                    raise ValueError(f"Unexpected image shape: {image.shape}")
+            else:
+                # 如果没有mask，假设image已经是RGBA格式
+                if isinstance(image, Image.Image):
+                    rgba_image = np.array(image)
+                else:
+                    rgba_image = np.array(image)
+            
+            # 转换为PIL Image（preprocess_image需要）
+            rgba_image_pil = Image.fromarray(rgba_image)
+            
+            # 调用preprocess_image（注意：InferencePipelinePointMap需要pointmap）
+            # 先检查是否是InferencePipelinePointMap
+            if hasattr(self, 'compute_pointmap'):
+                # 这是InferencePipelinePointMap，需要计算pointmap
+                pointmap_dict = self.compute_pointmap(rgba_image_pil, pointmap=None)
+                pointmap = pointmap_dict["pointmap"]
+                ss_input_dict = self.preprocess_image(
+                    rgba_image_pil, self.ss_preprocessor, pointmap=pointmap
+                )
+                slat_input_dict = self.preprocess_image(
+                    rgba_image_pil, self.slat_preprocessor
+                )
+            else:
+                # 这是InferencePipeline，不需要pointmap
+                ss_input_dict = self.preprocess_image(
+                    rgba_image_pil, self.ss_preprocessor
+                )
+                slat_input_dict = self.preprocess_image(
+                    rgba_image_pil, self.slat_preprocessor
+                )
+            
+            view_ss_input_dicts.append(ss_input_dict)
+            view_slat_input_dicts.append(slat_input_dict)
+        
+        # Stage 1: 生成稀疏结构
+        logger.info("Stage 1: Sampling sparse structure...")
+        ss_return_dict = self.sample_sparse_structure_multi_view(
+            view_ss_input_dicts,
+            inference_steps=stage1_inference_steps,
+            use_distillation=use_stage1_distillation,
+            mode=mode,
+        )
+        
+        ss_return_dict.update(self.pose_decoder(ss_return_dict))
+        
+        if "scale" in ss_return_dict:
+            logger.info(f"Rescaling scale by {ss_return_dict['downsample_factor']}")
+            ss_return_dict["scale"] = ss_return_dict["scale"] * ss_return_dict["downsample_factor"]
+        
+        if stage1_only:
+            logger.info("Finished!")
+            ss_return_dict["voxel"] = ss_return_dict["coords"][:, 1:] / 64 - 0.5
+            return ss_return_dict
+        
+        # Stage 2: 生成结构化潜在
+        coords = ss_return_dict["coords"]
+        logger.info("Stage 2: Sampling structured latent...")
+        slat = self.sample_slat_multi_view(
+            view_slat_input_dicts,
+            coords,
+            inference_steps=stage2_inference_steps,
+            use_distillation=use_stage2_distillation,
+            mode=mode,
+        )
+        
+        # 解码
+        outputs = self.decode_slat(
+            slat, self.decode_formats if decode_formats is None else decode_formats
+        )
+        outputs = self.postprocess_slat_output(
+            outputs, with_mesh_postprocess, with_texture_baking, use_vertex_color
+        )
+        logger.info("Finished!")
+        
+        return {
+            **ss_return_dict,
+            **outputs,
+        }

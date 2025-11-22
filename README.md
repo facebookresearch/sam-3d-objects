@@ -1,6 +1,7 @@
+
 # SAM 3D
 
-SAM 3D Objects is one part of SAM 3D, a pair of models for object and human mesh reconstruction.  If you’re looking for SAM 3D Body, [click here](https://github.com/facebookresearch/sam-3d-body).
+SAM 3D Objects is one part of SAM 3D, a pair of models for object and human mesh reconstruction.  If you're looking for SAM 3D Body, [click here](https://github.com/facebookresearch/sam-3d-body).
 
 # SAM 3D Objects
 
@@ -67,6 +68,140 @@ For  more details and multi-object reconstruction, please take a look at out two
 * [single object](notebook/demo_single_object.ipynb)
 * [multi object](notebook/demo_multi_object.ipynb)
 
+## Multi-View 3D Reconstruction
+
+This contribution adds **training-free multi-view 3D reconstruction** capability to SAM 3D Objects using a multidiffusion approach. This allows you to generate consistent 3D models from multiple input images of the same object from different viewpoints, without requiring model retraining.
+
+### Results Comparison
+
+The following comparison demonstrates the improvement of multi-view reconstruction over single-view reconstruction:
+
+<table>
+<tr>
+  <td align="center" width="33%"><b>Single-View (View 3)</b></td>
+  <td align="center" width="33%"><b>Single-View (View 6)</b></td>
+  <td align="center" width="33%"><b>Multi-View (All 8 Views)</b></td>
+</tr>
+<tr>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>Input Image</b><br>
+    <img src="data/example/images/3.png" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>Input Image</b><br>
+    <img src="data/example/images/6.png" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>Input Images</b><br>
+    <table width="100%" cellpadding="2" cellspacing="2">
+    <tr>
+      <td align="center"><img src="data/example/images/1.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/2.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/3.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/4.png" width="80px"/></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="data/example/images/5.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/6.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/7.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/8.png" width="80px"/></td>
+    </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+  <td align="center" colspan="3">
+    <b>↓ 3D Reconstruction ↓</b>
+  </td>
+</tr>
+<tr>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>3D Result</b><br>
+    <img src="data/example/visualization_results/view3_cropped.gif" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>3D Result</b><br>
+    <img src="data/example/visualization_results/view6_cropped.gif" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>3D Result</b><br>
+    <img src="data/example/visualization_results/all_views_cropped.gif" width="100%" style="max-width: 300px;"/>
+  </td>
+</tr>
+<tr>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> Due to occlusion in the input image, the red collar on the dog is not visible, resulting in its absence in the generated 3D model.</small>
+  </td>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> Many frontal parts of the dog are occluded or not visible from this angle, leading to structural errors in the front-facing regions of the generated model.</small>
+  </td>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> By combining information from all 8 views, the multi-view reconstruction produces a complete and accurate 3D model that closely matches the actual object.</small>
+  </td>
+</tr>
+</table>
+
+### Quick Start
+
+Use the `run_inference.py` script for both single-view and multi-view reconstruction:
+
+```bash
+# Multi-view reconstruction (mask_prompt=None, images and masks in same directory)
+python run_inference.py --input_path ./data/images_and_masks
+
+# Single-view reconstruction (specify a single image name)
+python run_inference.py --input_path ./data/images_and_masks --image_names image1
+
+# Multi-view reconstruction (mask_prompt!=None, images in images/, masks in {mask_prompt}/)
+python run_inference.py --input_path ./data --mask_prompt stuffed_toy
+
+# Specify multiple image names (can be any filename without extension)
+python run_inference.py --input_path ./data --mask_prompt stuffed_toy --image_names image1,view_a,2
+```
+
+### Data Structure
+
+Multi-view data can be organized in two ways:
+
+**Structure 1** (when `mask_prompt=None`): Images and masks in the same directory
+```
+input_path/
+    ├── 1.png          # Original image (PNG format)
+    ├── 1_mask.png     # Mask (RGBA format, alpha channel stores mask info)
+    ├── 2.png
+    ├── 2_mask.png
+    └── ...
+```
+
+**Structure 2** (when `mask_prompt!=None`, e.g., `mask_prompt="stuffed_toy"`): Images and masks in separate directories
+```
+input_path/
+    ├── images/
+    │   ├── 1.png
+    │   ├── 2.png
+    │   └── ...
+    └── stuffed_toy/  (or {mask_prompt}/)
+        ├── 1.png (or 1_mask.png)
+        ├── 2.png (or 2_mask.png)
+        └── ...
+```
+
+**Mask Format**: RGBA format where the alpha channel stores mask information (alpha=255 for object, alpha=0 for background).
+
+### Command Line Options
+
+Run `python run_inference.py --help` for full documentation. Key parameters:
+
+- `--input_path`: Path to input directory (required)
+- `--mask_prompt`: Mask folder name. If None, images and masks are in the same directory; if specified, images are in `input_path/images/` and masks are in `input_path/{mask_prompt}/`
+- `--image_names`: Image names (without extension), e.g., `"image1,view_a"` or `"1,2"` or `"image1"`. Can specify multiple, comma-separated. If not specified, uses all available images
+- `--decode_formats`: Output formats, e.g., `"gaussian,mesh"` or `"gaussian"` (default: `gaussian,mesh`)
+- `--seed`: Random seed (default: 42)
+- `--stage1_steps`: Stage 1 inference steps (default: 50)
+- `--stage2_steps`: Stage 2 inference steps (default: 25)
+- `--model_tag`: Model tag (default: hf)
+
+The script automatically detects whether to use single-view or multi-view inference based on the number of views provided. Multi-view reconstruction uses a training-free multidiffusion approach to fuse predictions from all views.
 
 ## SAM 3D Body
 

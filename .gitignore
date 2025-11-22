@@ -1,1 +1,22 @@
 __pycache__
+*.pyc
+*.py~
+*.swp
+*.swo
+*~
+
+# Output directories
+visualization/
+outputs/
+*.ply
+*.glb
+*.obj
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
