@@ -17,28 +17,28 @@ The following comparison demonstrates the improvement of multi-view reconstructi
   <td align="center" width="33%"><b>Multi-View (All 8 Views)</b></td>
 </tr>
 <tr>
-  <td align="center" width="33%">
+  <td align="center" width="33%" style="padding: 5px;">
     <b>Input Image</b><br>
-    <img src="data/example/images/3.png" width="100%"/>
+    <img src="data/example/images/3.png" width="100%" style="max-width: 300px;"/>
   </td>
-  <td align="center" width="33%">
+  <td align="center" width="33%" style="padding: 5px;">
     <b>Input Image</b><br>
-    <img src="data/example/images/6.png" width="100%"/>
+    <img src="data/example/images/6.png" width="100%" style="max-width: 300px;"/>
   </td>
-  <td align="center" width="33%">
+  <td align="center" width="33%" style="padding: 5px;">
     <b>Input Images</b><br>
-    <table width="100%">
+    <table width="100%" cellpadding="2" cellspacing="2">
     <tr>
-      <td><img src="data/example/images/1.png" width="100%"/></td>
-      <td><img src="data/example/images/2.png" width="100%"/></td>
-      <td><img src="data/example/images/3.png" width="100%"/></td>
-      <td><img src="data/example/images/4.png" width="100%"/></td>
+      <td align="center"><img src="data/example/images/1.png" width="60px"/></td>
+      <td align="center"><img src="data/example/images/2.png" width="60px"/></td>
+      <td align="center"><img src="data/example/images/3.png" width="60px"/></td>
+      <td align="center"><img src="data/example/images/4.png" width="60px"/></td>
     </tr>
     <tr>
-      <td><img src="data/example/images/5.png" width="100%"/></td>
-      <td><img src="data/example/images/6.png" width="100%"/></td>
-      <td><img src="data/example/images/7.png" width="100%"/></td>
-      <td><img src="data/example/images/8.png" width="100%"/></td>
+      <td align="center"><img src="data/example/images/5.png" width="60px"/></td>
+      <td align="center"><img src="data/example/images/6.png" width="60px"/></td>
+      <td align="center"><img src="data/example/images/7.png" width="60px"/></td>
+      <td align="center"><img src="data/example/images/8.png" width="60px"/></td>
     </tr>
     </table>
   </td>
@@ -49,23 +49,23 @@ The following comparison demonstrates the improvement of multi-view reconstructi
   </td>
 </tr>
 <tr>
-  <td align="center" width="33%">
+  <td align="center" width="33%" style="padding: 5px;">
     <b>3D Result</b><br>
-    <video width="100%" controls>
+    <video width="100%" controls style="max-width: 300px;">
       <source src="data/example/visualization_results/view3_cropped.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
   </td>
-  <td align="center" width="33%">
+  <td align="center" width="33%" style="padding: 5px;">
     <b>3D Result</b><br>
-    <video width="100%" controls>
+    <video width="100%" controls style="max-width: 300px;">
       <source src="data/example/visualization_results/view6_cropped.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
   </td>
-  <td align="center" width="33%">
+  <td align="center" width="33%" style="padding: 5px;">
     <b>3D Result</b><br>
-    <video width="100%" controls>
+    <video width="100%" controls style="max-width: 300px;">
       <source src="data/example/visualization_results/all_views_cropped.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
