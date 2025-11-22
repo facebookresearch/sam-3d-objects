@@ -104,9 +104,6 @@ def run_inference(
     stage1_steps: int = 50,
     stage2_steps: int = 25,
     decode_formats: List[str] = None,
-    mesh_postprocess: bool = False,
-    texture_baking: bool = False,
-    vertex_color: bool = True,
     model_tag: str = "hf",
 ):
     """
@@ -121,9 +118,6 @@ def run_inference(
         stage1_steps: Stage 1 inference steps
         stage2_steps: Stage 2 inference steps
         decode_formats: List of decode formats
-        mesh_postprocess: Whether to perform mesh post-processing
-        texture_baking: Whether to perform texture baking
-        vertex_color: Whether to use vertex colors
         model_tag: Model tag
     """
     config_path = f"checkpoints/{model_tag}/pipeline.yaml"
@@ -172,9 +166,9 @@ def run_inference(
             stage1_inference_steps=stage1_steps,
             stage2_inference_steps=stage2_steps,
             decode_formats=decode_formats,
-            with_mesh_postprocess=mesh_postprocess,
-            with_texture_baking=texture_baking,
-            use_vertex_color=vertex_color,
+            with_mesh_postprocess=False,
+            with_texture_baking=False,
+            use_vertex_color=True,
         )
     
     output_dir = get_output_dir(input_path, mask_prompt, image_names, is_single_view)
@@ -285,28 +279,6 @@ Examples:
         default="gaussian,mesh",
         help="Decode formats, comma-separated, e.g., 'gaussian,mesh' or 'gaussian' (default: gaussian,mesh)"
     )
-    parser.add_argument(
-        "--mesh_postprocess",
-        action="store_true",
-        help="Enable mesh post-processing (simplification, hole filling, etc.)"
-    )
-    parser.add_argument(
-        "--texture_baking",
-        action="store_true",
-        help="Enable texture baking (generate textured GLB)"
-    )
-    parser.add_argument(
-        "--vertex_color",
-        action="store_true",
-        default=True,
-        help="Use vertex colors (default: True, mutually exclusive with --no_vertex_color)"
-    )
-    parser.add_argument(
-        "--no_vertex_color",
-        action="store_false",
-        dest="vertex_color",
-        help="Do not use vertex colors (mutually exclusive with --vertex_color)"
-    )
     
     parser.add_argument(
         "--model_tag",
@@ -336,9 +308,6 @@ Examples:
             stage1_steps=args.stage1_steps,
             stage2_steps=args.stage2_steps,
             decode_formats=decode_formats,
-            mesh_postprocess=args.mesh_postprocess,
-            texture_baking=args.texture_baking,
-            vertex_color=args.vertex_color,
             model_tag=args.model_tag,
         )
     except Exception as e:

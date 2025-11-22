@@ -1,6 +1,35 @@
+# SAM 3D Objects (Multi-View Extension)
+
+This is a fork of [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-objects) with **multi-view 3D reconstruction** support.
+
+## 🆕 What's New
+
+**Multi-View 3D Reconstruction**: This fork adds training-free multi-view inference capability using a multidiffusion approach. You can now generate consistent 3D models from multiple input images of the same object from different viewpoints, without requiring model retraining.
+
+
+### Quick Start
+
+```bash
+# Multi-view reconstruction (mask_prompt=None, images and masks in same directory)
+python run_inference.py --input_path ./data/images_and_masks
+
+# Single-view reconstruction (specify a single image name)
+python run_inference.py --input_path ./data/images_and_masks --image_names image1
+
+# Multi-view reconstruction (mask_prompt!=None, images in images/, masks in {mask_prompt}/)
+python run_inference.py --input_path ./data --mask_prompt stuffed_toy
+
+# Specify multiple image names (can be any filename without extension)
+python run_inference.py --input_path ./data --mask_prompt stuffed_toy --image_names image1,view_a,2
+```
+
+See the [Multi-View 3D Reconstruction](#multi-view-3d-reconstruction) section below for detailed documentation.
+
+---
+
 # SAM 3D
 
-SAM 3D Objects is one part of SAM 3D, a pair of models for object and human mesh reconstruction.  If you’re looking for SAM 3D Body, [click here](https://github.com/facebookresearch/sam-3d-body).
+SAM 3D Objects is one part of SAM 3D, a pair of models for object and human mesh reconstruction.  If you're looking for SAM 3D Body, [click here](https://github.com/facebookresearch/sam-3d-body).
 
 # SAM 3D Objects
 
@@ -79,14 +108,14 @@ Use the `run_inference.py` script for both single-view and multi-view reconstruc
 # Multi-view reconstruction (mask_prompt=None, images and masks in same directory)
 python run_inference.py --input_path ./data/images_and_masks
 
-# Single-view reconstruction (specify a single view)
-python run_inference.py --input_path ./data/images_and_masks --views 1
+# Single-view reconstruction (specify a single image name)
+python run_inference.py --input_path ./data/images_and_masks --image_names image1
 
 # Multi-view reconstruction (mask_prompt!=None, images in images/, masks in {mask_prompt}/)
 python run_inference.py --input_path ./data --mask_prompt stuffed_toy
 
-# Multi-view reconstruction (specify specific views)
-python run_inference.py --input_path ./data --mask_prompt stuffed_toy --views 1,2,3,4
+# Specify multiple image names (can be any filename without extension)
+python run_inference.py --input_path ./data --mask_prompt stuffed_toy --image_names image1,view_a,2
 ```
 
 ### Data Structure
@@ -124,11 +153,12 @@ Run `python run_inference.py --help` for full documentation. Key parameters:
 
 - `--input_path`: Path to input directory (required)
 - `--mask_prompt`: Mask folder name. If None, images and masks are in the same directory; if specified, images are in `input_path/images/` and masks are in `input_path/{mask_prompt}/`
-- `--views`: View indices, e.g., `"1,2,3"` or `"1"` (if not specified, uses all available views)
+- `--image_names`: Image names (without extension), e.g., `"image1,view_a"` or `"1,2"` or `"image1"`. Can specify multiple, comma-separated. If not specified, uses all available images
 - `--decode_formats`: Output formats, e.g., `"gaussian,mesh"` or `"gaussian"` (default: `gaussian,mesh`)
-- `--mesh_postprocess`: Enable mesh post-processing
-- `--texture_baking`: Enable texture baking for GLB files
-- `--vertex_color`: Use vertex colors (default: True)
+- `--seed`: Random seed (default: 42)
+- `--stage1_steps`: Stage 1 inference steps (default: 50)
+- `--stage2_steps`: Stage 2 inference steps (default: 25)
+- `--model_tag`: Model tag (default: hf)
 
 The script automatically detects whether to use single-view or multi-view inference based on the number of views provided. Multi-view reconstruction uses a training-free multidiffusion approach to fuse predictions from all views.
 
