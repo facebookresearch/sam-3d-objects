@@ -113,6 +113,9 @@ class Inference:
         mask: Optional[Union[None, Image.Image, np.ndarray]],
         seed: Optional[int] = None,
         pointmap=None,
+        export_usd_path: Optional[str] = None,
+        usd_scale_factor: float = 100.0,
+        embed_textures: bool = True,
     ) -> dict:
         image = self.merge_mask_to_rgba(image, mask)
         return self._pipeline.run(
@@ -126,6 +129,9 @@ class Inference:
             use_vertex_color=True,
             stage1_inference_steps=None,
             pointmap=pointmap,
+            usd_path=export_usd_path,
+            usd_scale_factor=usd_scale_factor,
+            embed_textures=embed_textures,
         )
 
 
