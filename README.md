@@ -1,99 +1,3 @@
-# SAM 3D Objects (Multi-View Extension)
-
-This is a fork of [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-objects) with **multi-view 3D reconstruction** support.
-
-## 🆕 What's New
-
-**Multi-View 3D Reconstruction**: This fork adds training-free multi-view inference capability using a multidiffusion approach. You can now generate consistent 3D models from multiple input images of the same object from different viewpoints, without requiring model retraining.
-
-### Results Comparison
-
-The following comparison demonstrates the improvement of multi-view reconstruction over single-view reconstruction:
-
-<table>
-<tr>
-  <td align="center" width="33%"><b>Single-View (View 3)</b></td>
-  <td align="center" width="33%"><b>Single-View (View 6)</b></td>
-  <td align="center" width="33%"><b>Multi-View (All 8 Views)</b></td>
-</tr>
-<tr>
-  <td align="center" width="33%" style="padding: 5px;">
-    <b>Input Image</b><br>
-    <img src="data/example/images/3.png" width="100%" style="max-width: 300px;"/>
-  </td>
-  <td align="center" width="33%" style="padding: 5px;">
-    <b>Input Image</b><br>
-    <img src="data/example/images/6.png" width="100%" style="max-width: 300px;"/>
-  </td>
-  <td align="center" width="33%" style="padding: 5px;">
-    <b>Input Images</b><br>
-    <table width="100%" cellpadding="2" cellspacing="2">
-    <tr>
-      <td align="center"><img src="data/example/images/1.png" width="80px"/></td>
-      <td align="center"><img src="data/example/images/2.png" width="80px"/></td>
-      <td align="center"><img src="data/example/images/3.png" width="80px"/></td>
-      <td align="center"><img src="data/example/images/4.png" width="80px"/></td>
-    </tr>
-    <tr>
-      <td align="center"><img src="data/example/images/5.png" width="80px"/></td>
-      <td align="center"><img src="data/example/images/6.png" width="80px"/></td>
-      <td align="center"><img src="data/example/images/7.png" width="80px"/></td>
-      <td align="center"><img src="data/example/images/8.png" width="80px"/></td>
-    </tr>
-    </table>
-  </td>
-</tr>
-<tr>
-  <td align="center" colspan="3">
-    <b>↓ 3D Reconstruction ↓</b>
-  </td>
-</tr>
-<tr>
-  <td align="center" width="33%" style="padding: 5px;">
-    <b>3D Result</b><br>
-    <img src="data/example/visualization_results/view3_cropped.gif" width="100%" style="max-width: 300px;"/>
-  </td>
-  <td align="center" width="33%" style="padding: 5px;">
-    <b>3D Result</b><br>
-    <img src="data/example/visualization_results/view6_cropped.gif" width="100%" style="max-width: 300px;"/>
-  </td>
-  <td align="center" width="33%" style="padding: 5px;">
-    <b>3D Result</b><br>
-    <img src="data/example/visualization_results/all_views_cropped.gif" width="100%" style="max-width: 300px;"/>
-  </td>
-</tr>
-<tr>
-  <td align="left" width="33%" style="padding: 10px;">
-    <small><b>Analysis:</b> Due to occlusion in the input image, the red collar on the dog is not visible, resulting in its absence in the generated 3D model.</small>
-  </td>
-  <td align="left" width="33%" style="padding: 10px;">
-    <small><b>Analysis:</b> Many frontal parts of the dog are occluded or not visible from this angle, leading to structural errors in the front-facing regions of the generated model.</small>
-  </td>
-  <td align="left" width="33%" style="padding: 10px;">
-    <small><b>Analysis:</b> By combining information from all 8 views, the multi-view reconstruction produces a complete and accurate 3D model that closely matches the actual object.</small>
-  </td>
-</tr>
-</table>
-
-### Quick Start
-
-```bash
-# Multi-view reconstruction (mask_prompt=None, images and masks in same directory)
-python run_inference.py --input_path ./data/images_and_masks
-
-# Single-view reconstruction (specify a single image name)
-python run_inference.py --input_path ./data/images_and_masks --image_names image1
-
-# Multi-view reconstruction (mask_prompt!=None, images in images/, masks in {mask_prompt}/)
-python run_inference.py --input_path ./data --mask_prompt stuffed_toy
-
-# Specify multiple image names (can be any filename without extension)
-python run_inference.py --input_path ./data --mask_prompt stuffed_toy --image_names image1,view_a,2
-```
-
-See the [Multi-View 3D Reconstruction](#multi-view-3d-reconstruction) section below for detailed documentation.
-
----
 
 # SAM 3D
 
@@ -166,7 +70,76 @@ For  more details and multi-object reconstruction, please take a look at out two
 
 ## Multi-View 3D Reconstruction
 
-SAM 3D Objects now supports multi-view 3D reconstruction using a training-free multidiffusion approach. This allows you to generate consistent 3D models from multiple input images of the same object from different viewpoints.
+This contribution adds **training-free multi-view 3D reconstruction** capability to SAM 3D Objects using a multidiffusion approach. This allows you to generate consistent 3D models from multiple input images of the same object from different viewpoints, without requiring model retraining.
+
+### Results Comparison
+
+The following comparison demonstrates the improvement of multi-view reconstruction over single-view reconstruction:
+
+<table>
+<tr>
+  <td align="center" width="33%"><b>Single-View (View 3)</b></td>
+  <td align="center" width="33%"><b>Single-View (View 6)</b></td>
+  <td align="center" width="33%"><b>Multi-View (All 8 Views)</b></td>
+</tr>
+<tr>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>Input Image</b><br>
+    <img src="data/example/images/3.png" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>Input Image</b><br>
+    <img src="data/example/images/6.png" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>Input Images</b><br>
+    <table width="100%" cellpadding="2" cellspacing="2">
+    <tr>
+      <td align="center"><img src="data/example/images/1.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/2.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/3.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/4.png" width="80px"/></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="data/example/images/5.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/6.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/7.png" width="80px"/></td>
+      <td align="center"><img src="data/example/images/8.png" width="80px"/></td>
+    </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+  <td align="center" colspan="3">
+    <b>↓ 3D Reconstruction ↓</b>
+  </td>
+</tr>
+<tr>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>3D Result</b><br>
+    <img src="data/example/visualization_results/view3_cropped.gif" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>3D Result</b><br>
+    <img src="data/example/visualization_results/view6_cropped.gif" width="100%" style="max-width: 300px;"/>
+  </td>
+  <td align="center" width="33%" style="padding: 5px;">
+    <b>3D Result</b><br>
+    <img src="data/example/visualization_results/all_views_cropped.gif" width="100%" style="max-width: 300px;"/>
+  </td>
+</tr>
+<tr>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> Due to occlusion in the input image, the red collar on the dog is not visible, resulting in its absence in the generated 3D model.</small>
+  </td>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> Many frontal parts of the dog are occluded or not visible from this angle, leading to structural errors in the front-facing regions of the generated model.</small>
+  </td>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> By combining information from all 8 views, the multi-view reconstruction produces a complete and accurate 3D model that closely matches the actual object.</small>
+  </td>
+</tr>
+</table>
 
 ### Quick Start
 
