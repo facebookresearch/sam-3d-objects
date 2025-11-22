@@ -6,6 +6,83 @@ This is a fork of [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-ob
 
 **Multi-View 3D Reconstruction**: This fork adds training-free multi-view inference capability using a multidiffusion approach. You can now generate consistent 3D models from multiple input images of the same object from different viewpoints, without requiring model retraining.
 
+### Results Comparison
+
+The following comparison demonstrates the improvement of multi-view reconstruction over single-view reconstruction:
+
+<table>
+<tr>
+  <td align="center" width="33%"><b>Single-View (View 3)</b></td>
+  <td align="center" width="33%"><b>Single-View (View 6)</b></td>
+  <td align="center" width="33%"><b>Multi-View (All 8 Views)</b></td>
+</tr>
+<tr>
+  <td align="center" width="33%">
+    <b>Input Image</b><br>
+    <img src="data/example/images/3.png" width="100%"/>
+  </td>
+  <td align="center" width="33%">
+    <b>Input Image</b><br>
+    <img src="data/example/images/6.png" width="100%"/>
+  </td>
+  <td align="center" width="33%">
+    <b>Input Images</b><br>
+    <table width="100%">
+    <tr>
+      <td><img src="data/example/images/1.png" width="100%"/></td>
+      <td><img src="data/example/images/2.png" width="100%"/></td>
+      <td><img src="data/example/images/3.png" width="100%"/></td>
+      <td><img src="data/example/images/4.png" width="100%"/></td>
+    </tr>
+    <tr>
+      <td><img src="data/example/images/5.png" width="100%"/></td>
+      <td><img src="data/example/images/6.png" width="100%"/></td>
+      <td><img src="data/example/images/7.png" width="100%"/></td>
+      <td><img src="data/example/images/8.png" width="100%"/></td>
+    </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+  <td align="center" colspan="3">
+    <b>↓ 3D Reconstruction ↓</b>
+  </td>
+</tr>
+<tr>
+  <td align="center" width="33%">
+    <b>3D Result</b><br>
+    <video width="100%" controls>
+      <source src="data/example/visualization_results/view3_cropped.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </td>
+  <td align="center" width="33%">
+    <b>3D Result</b><br>
+    <video width="100%" controls>
+      <source src="data/example/visualization_results/view6_cropped.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </td>
+  <td align="center" width="33%">
+    <b>3D Result</b><br>
+    <video width="100%" controls>
+      <source src="data/example/visualization_results/all_views_cropped.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </td>
+</tr>
+<tr>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> Due to occlusion in the input image, the red collar on the dog is not visible, resulting in its absence in the generated 3D model.</small>
+  </td>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> Many frontal parts of the dog are occluded or not visible from this angle, leading to structural errors in the front-facing regions of the generated model.</small>
+  </td>
+  <td align="left" width="33%" style="padding: 10px;">
+    <small><b>Analysis:</b> By combining information from all 8 views, the multi-view reconstruction produces a complete and accurate 3D model that closely matches the actual object.</small>
+  </td>
+</tr>
+</table>
 
 ### Quick Start
 
