@@ -670,7 +670,6 @@ def to_glb(
             verbose=verbose,
             rendering_engine=rendering_engine
         )
-        texture = Image.fromarray(texture)
         baked_texture = Image.fromarray(texture)
         material = trimesh.visual.material.PBRMaterial(
             roughnessFactor=1.0,
@@ -798,23 +797,49 @@ def to_usd(
         tex_shader.CreateIdAttr("UsdUVTexture")
         tex_shader.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(rel_tex_path)
         tex_shader.CreateInput("sourceColorSpace", Sdf.ValueTypeNames.Token).Set("sRGB")
-        tex_shader.CreateOutput("rgb", Sdf.ValueTypeNames.Float3)
+        tex_shader_output = tex_shader.CreateOutput("rgb", Sdf.ValueTypeNames.Float3)
 
         if primvars_api.HasPrimvar("st"):
-            st_reader = material.CreateInput("st_reader", Sdf.ValueTypeNames.Float2)
-            st_reader.ConnectToSource(primvars_api.GetPrimvar("st"))
-            tex_shader.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(st_reader)
+            # Create a PrimvarReader to feed UVs to the texture shader.
+            primvar_reader = UsdShade.Shader.Define(stage, "/Material/PrimvarStReader")
+            primvar_reader.CreateIdAttr("UsdPrimvarReader_float2")
+            primvar_reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
+            primvar_output = primvar_reader.CreateOutput("result", Sdf.ValueTypeNames.Float2)
+
+            st_input = tex_shader.CreateInput("st", Sdf.ValueTypeNames.Float2)
+            st_input.ConnectToSource(primvar_output)
         else:
             tex_shader.CreateInput("st", Sdf.ValueTypeNames.Float2).Set(Gf.Vec2f(0.0, 0.0))
 
-        shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(
-            tex_shader, "rgb"
-        )
+        shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(tex_shader_output)
 
-        material.CreateSurfaceOutput().ConnectToSource(shader, "surface")
+        shader_surface = shader.CreateOutput("surface", Sdf.ValueTypeNames.Token)
+        material.CreateSurfaceOutput().ConnectToSource(shader_surface)
         UsdShade.MaterialBindingAPI(mesh_prim).Bind(material)
 
     stage.GetRootLayer().Save()
+
+
+def to_usdz(archive_path: str, usd_path: str, first_layer_name: str = "", edit_in_place: bool = False):
+    """
+    Package a USD and its asset files into a single USDZ archive.
+
+    Note: USDZ in pxr requires a single root USD; assets referenced by relative
+    paths are pulled in automatically.
+    """
+    try:
+        from pxr import UsdUtils, Sdf  # type: ignore
+    except ImportError as e:
+        raise ImportError(
+            "USDZ export requires the 'pxr' package (e.g. `pip install usd-core`)."
+        ) from e
+
+    UsdUtils.CreateNewUsdzPackage(
+        Sdf.AssetPath(str(usd_path)),
+        str(archive_path),
+        first_layer_name,
+        edit_in_place,
+    )
 
 
 def simplify_gs(

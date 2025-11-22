@@ -1,5 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 import os
+from pathlib import Path
 
 from tqdm import tqdm
 import torch
@@ -585,8 +586,16 @@ class InferencePipeline:
                             scale_factor=usd_scale_factor,
                         )
                         outputs["usd_path"] = usd_path
+                        # Also package USDZ with embedded texture for portability.
+                        usdz_path = Path(usd_path).with_suffix(".usdz")
+                        try:
+                            postprocessing_utils.to_usdz(str(usdz_path), usd_path)
+                            outputs["usdz_path"] = str(usdz_path)
+                        except Exception as e:
+                            logger.error("USDZ export failed: {}", e, exc_info=True)
+                            outputs["usdz_path"] = None
                     except Exception as e:
-                        logger.error(f"USD export failed: {e}", exc_info=True)
+                        logger.error("USD export failed: {}", e, exc_info=True)
                         outputs["usd_path"] = None
             else:
                 glb = glb_result
