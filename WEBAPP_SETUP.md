@@ -174,6 +174,7 @@ The backend provides the following API endpoints:
 
 - `HF_TOKEN` - Hugging Face authentication token (required)
 - `KIE_API_KEY` - kie.ai API key for image generation
+- `KIE_API_ENDPOINT` - kie.ai API endpoint URL (optional, defaults to placeholder)
 - `PORT` - Server port (default: 8000)
 - `HOST` - Server host (default: 0.0.0.0)
 

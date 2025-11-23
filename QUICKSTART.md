@@ -66,6 +66,7 @@ Open http://localhost:5173
 |----------|-------------|----------|
 | `HF_TOKEN` | Hugging Face authentication token | Yes |
 | `KIE_API_KEY` | kie.ai API key for image generation | For image gen |
+| `KIE_API_ENDPOINT` | kie.ai API endpoint URL | No (has default) |
 | `PORT` | Server port (default: 8000) | No |
 | `HOST` | Server host (default: 0.0.0.0) | No |
 

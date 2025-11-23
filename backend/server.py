@@ -150,7 +150,6 @@ async def process_image(
         output = sam3d_image_model(image_np, mask, seed=42)
         
         # Save output as PLY file using secure temp file
-        import tempfile
         fd, output_path = tempfile.mkstemp(suffix=".ply")
         os.close(fd)  # Close file descriptor, we just need the path
         output["gs"].save_ply(output_path)
@@ -235,10 +234,13 @@ async def generate_image_kie(text_prompt: str = Form(...)):
         logger.info(f"Generating image with kie.ai for prompt: {text_prompt}")
         
         # Make API call to kie.ai
+        # NOTE: Replace the URL below with the actual kie.ai "nano banana" API endpoint
+        # This is a placeholder that needs to be updated with the correct endpoint from kie.ai documentation
+        KIE_API_ENDPOINT = os.getenv("KIE_API_ENDPOINT", "https://api.kie.ai/v1/generate/nano-banana")
+        
         async with httpx.AsyncClient(timeout=60.0) as client:
-            # Note: This is a placeholder URL - update with actual kie.ai API endpoint
             response = await client.post(
-                "https://api.kie.ai/v1/generate/nano-banana",
+                KIE_API_ENDPOINT,
                 headers={
                     "Authorization": f"Bearer {KIE_API_KEY}",
                     "Content-Type": "application/json"
