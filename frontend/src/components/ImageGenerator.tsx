@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 
 interface ImageGeneratorProps {
@@ -10,6 +10,15 @@ export default function ImageGenerator({ onGeneratedImage }: ImageGeneratorProps
   const [loading, setLoading] = useState(false)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Clean up object URL on unmount or when it changes
+  useEffect(() => {
+    return () => {
+      if (generatedImage && generatedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(generatedImage)
+      }
+    }
+  }, [generatedImage])
 
   const handleGenerate = async () => {
     if (!prompt) {

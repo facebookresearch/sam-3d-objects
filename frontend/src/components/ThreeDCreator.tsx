@@ -43,6 +43,23 @@ export default function ThreeDCreator({ generatedImage }: ThreeDCreatorProps) {
   const [model3D, setModel3D] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Clean up object URLs on unmount or when they change
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
+  useEffect(() => {
+    return () => {
+      if (model3D && model3D.startsWith('blob:')) {
+        URL.revokeObjectURL(model3D)
+      }
+    }
+  }, [model3D])
+
   // Update preview when generatedImage changes
   useEffect(() => {
     if (generatedImage) {
@@ -61,12 +78,17 @@ export default function ThreeDCreator({ generatedImage }: ThreeDCreatorProps) {
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
+      // Revoke previous URL before creating new one
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+      
       setFile(selectedFile)
       setPreviewUrl(URL.createObjectURL(selectedFile))
       setModel3D(null)
       setError(null)
     }
-  }, [])
+  }, [previewUrl])
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -74,12 +96,17 @@ export default function ThreeDCreator({ generatedImage }: ThreeDCreatorProps) {
     
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile && droppedFile.type.startsWith('image/')) {
+      // Revoke previous URL before creating new one
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+      
       setFile(droppedFile)
       setPreviewUrl(URL.createObjectURL(droppedFile))
       setModel3D(null)
       setError(null)
     }
-  }, [])
+  }, [previewUrl])
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()

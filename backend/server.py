@@ -20,6 +20,7 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import uvicorn
 import numpy as np
 from PIL import Image
@@ -41,25 +42,10 @@ KIE_API_KEY = os.getenv("KIE_API_KEY", "")
 sam3d_image_model = None
 sam3d_video_predictor = None
 
-app = FastAPI(
-    title="SAM 3D Objects API",
-    description="Unified API for SAM 3D object tracking, image generation, and 3D model creation",
-    version="1.0.0"
-)
 
-# CORS middleware for development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Load models on server startup"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle manager for model loading and cleanup"""
     global sam3d_image_model
     
     logger.info("Starting model initialization...")
@@ -89,6 +75,28 @@ async def startup_event():
         logger.error(f"Failed to load SAM 3D Image Model: {e}")
     
     logger.info("Server startup complete")
+    
+    yield
+    
+    # Cleanup on shutdown
+    logger.info("Shutting down server...")
+
+
+app = FastAPI(
+    title="SAM 3D Objects API",
+    description="Unified API for SAM 3D object tracking, image generation, and 3D model creation",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS middleware for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -141,15 +149,18 @@ async def process_image(
         logger.info(f"Processing image with prompt: {text_prompt}")
         output = sam3d_image_model(image_np, mask, seed=42)
         
-        # Save output as PLY file
-        output_path = tempfile.mktemp(suffix=".ply")
+        # Save output as PLY file using secure temp file
+        import tempfile
+        fd, output_path = tempfile.mkstemp(suffix=".ply")
+        os.close(fd)  # Close file descriptor, we just need the path
         output["gs"].save_ply(output_path)
         
         # Return the PLY file
         return FileResponse(
             output_path,
             media_type="application/octet-stream",
-            filename="processed_object.ply"
+            filename="processed_object.ply",
+            background=lambda: os.unlink(output_path)  # Clean up after sending
         )
         
     except Exception as e:
@@ -179,16 +190,19 @@ async def process_video(
         )
     
     try:
-        # Save uploaded video to temp file
+        # Save uploaded video to temp file using secure method
+        fd, video_path = tempfile.mkstemp(suffix=".mp4")
         video_bytes = await file.read()
-        video_path = tempfile.mktemp(suffix=".mp4")
-        with open(video_path, "wb") as f:
-            f.write(video_bytes)
+        os.write(fd, video_bytes)
+        os.close(fd)
         
         logger.info(f"Processing video with prompt: {text_prompt}")
         
         # TODO: Implement video processing with SAM 3D video predictor
         # This would use the stateful video_predictor.handle_request workflow
+        
+        # Clean up temp file
+        os.unlink(video_path)
         
         raise HTTPException(
             status_code=501,
@@ -279,8 +293,9 @@ async def generate_3d(file: UploadFile = File(...)):
         logger.info("Generating 3D model from image")
         output = sam3d_image_model(image_np, mask, seed=42)
         
-        # Save output as PLY first
-        ply_path = tempfile.mktemp(suffix=".ply")
+        # Save output as PLY using secure temp file
+        fd, ply_path = tempfile.mkstemp(suffix=".ply")
+        os.close(fd)  # Close file descriptor, we just need the path
         output["gs"].save_ply(ply_path)
         
         # TODO: Convert PLY to GLB format
@@ -290,7 +305,8 @@ async def generate_3d(file: UploadFile = File(...)):
         return FileResponse(
             ply_path,
             media_type="model/gltf-binary",
-            filename="model.ply"  # Will be handled as GLB-compatible on client
+            filename="model.ply",  # Will be handled as GLB-compatible on client
+            background=lambda: os.unlink(ply_path)  # Clean up after sending
         )
         
     except Exception as e:

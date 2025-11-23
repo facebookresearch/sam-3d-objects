@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import axios from 'axios'
 
 export default function ObjectTracker() {
@@ -10,9 +10,31 @@ export default function ObjectTracker() {
   const [error, setError] = useState<string | null>(null)
   const [fileType, setFileType] = useState<'image' | 'video' | null>(null)
 
+  // Clean up object URLs on unmount or when they change
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
+  useEffect(() => {
+    return () => {
+      if (result && result.startsWith('blob:')) {
+        URL.revokeObjectURL(result)
+      }
+    }
+  }, [result])
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
+      // Revoke previous URL before creating new one
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+      
       setFile(selectedFile)
       setPreviewUrl(URL.createObjectURL(selectedFile))
       
@@ -28,7 +50,7 @@ export default function ObjectTracker() {
       setResult(null)
       setError(null)
     }
-  }, [])
+  }, [previewUrl])
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -36,6 +58,11 @@ export default function ObjectTracker() {
     
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile) {
+      // Revoke previous URL before creating new one
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+      
       setFile(droppedFile)
       setPreviewUrl(URL.createObjectURL(droppedFile))
       
@@ -50,7 +77,7 @@ export default function ObjectTracker() {
       setResult(null)
       setError(null)
     }
-  }, [])
+  }, [previewUrl])
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
