@@ -8,6 +8,17 @@ The unified web application consists of:
 - **Backend**: Python FastAPI server that provides AI API endpoints and serves the React frontend
 - **Frontend**: React + TypeScript + Vite single-page application
 
+## Screenshots
+
+### Object Tracker
+![Object Tracker](doc/webapp-screenshots/object-tracker.png)
+
+### Image Generator
+![Image Generator](doc/webapp-screenshots/image-generator.png)
+
+### 3D Creator
+![3D Creator](doc/webapp-screenshots/3d-creator.png)
+
 ## Quick Start with Docker
 
 The easiest way to run the application is using Docker:
