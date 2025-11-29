@@ -63,6 +63,16 @@ output = inference(image, mask, seed=42)
 output["gs"].save_ply(f"splat.ply")
 ```
 
+## Web demo
+
+Launch the Gradio-powered web demo to upload an image and mask through the browser:
+
+```bash
+python web_app.py
+```
+
+By default the demo looks for the `hf` checkpoint under `checkpoints/hf/pipeline.yaml`. You can point the UI to a different tag if you have downloaded other checkpoints locally.
+
 For  more details and multi-object reconstruction, please take a look at out two jupyter notebooks:
 * [single object](notebook/demo_single_object.ipynb)
 * [multi object](notebook/demo_multi_object.ipynb)
