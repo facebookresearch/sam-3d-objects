@@ -35,6 +35,9 @@ uv pip install .
 
 # patch things that aren't yet in official pip packages
 ./patching/hydra # https://github.com/facebookresearch/hydra/pull/2863
+
+# install the LangSplat SAM:
+python -m pip install git+https://github.com/minghanqin/segment-anything-langsplat.git
 ```
 
 > If you still prefer a Conda-based workflow for GPU toolchains, you can reuse `environments/default.yml` to provision system libraries, then activate your environment and run `uv sync` inside it to install Python dependencies.
@@ -63,4 +66,12 @@ hf download \
   facebook/sam-3d-objects
 mv checkpoints/${TAG}-download/checkpoints checkpoints/${TAG}
 rm -rf checkpoints/${TAG}-download
+```
+
+⚠️ Download SAM V1 checkpoints to `checkpoints/samv1/`
+
+```bash
+mkdir checkpoints/samv1
+wget -O checkpoints/samv1/sam_vit_h_4b8939.pth \
+  https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
 ```

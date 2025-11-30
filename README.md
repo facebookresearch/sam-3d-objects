@@ -50,20 +50,7 @@ Converts masks into 3D USD files. Each USD file contains:
 - **Coordinate conversion**: Automatic Y-up to Z-up transform
 
 ## Installation
-
-Follow the [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-objects) installation guide.
-
-Install the LangSplat SAM:
-```bash
-python -m pip install git+https://github.com/minghanqin/segment-anything-langsplat.git
-```
-Download SAM V1 checkpoints to `checkpoints/samv1/`
-```bash
-cd sam-3d-objects
-mkdir checkpoints/samv1
-wget -O checkpoints/samv1/sam_vit_h_4b8939.pth \
-  https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
-```
+Follow the [setup](doc/setup.md) steps before running the following.
 
 ## Usage
 
