@@ -1,5 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 import os
+from pathlib import Path
 
 from tqdm import tqdm
 import torch
@@ -478,6 +479,10 @@ class InferencePipeline:
         use_stage1_distillation=False,
         use_stage2_distillation=False,
         decode_formats=None,
+        return_export_data=False,
+        usd_path=None,
+        usd_scale_factor: float = 100.0,
+        embed_textures=True,
     ) -> dict:
         """
         Parameters:
@@ -522,7 +527,14 @@ class InferencePipeline:
                 slat, self.decode_formats if decode_formats is None else decode_formats
             )
             outputs = self.postprocess_slat_output(
-                outputs, with_mesh_postprocess, with_texture_baking, use_vertex_color
+                outputs,
+                with_mesh_postprocess,
+                with_texture_baking,
+                use_vertex_color,
+                return_export_data=return_export_data,
+                usd_path=usd_path,
+                usd_scale_factor=usd_scale_factor,
+                embed_textures=embed_textures,
             )
             logger.info("Finished!")
 
@@ -532,14 +544,23 @@ class InferencePipeline:
             }
 
     def postprocess_slat_output(
-        self, outputs, with_mesh_postprocess, with_texture_baking, use_vertex_color
+        self,
+        outputs,
+        with_mesh_postprocess,
+        with_texture_baking,
+        use_vertex_color,
+        return_export_data=False,
+        usd_path=None,
+        usd_scale_factor: float = 100.0,
+        embed_textures=True,
     ):
         # GLB files can be extracted from the outputs
         logger.info(
             f"Postprocessing mesh with option with_mesh_postprocess {with_mesh_postprocess}, with_texture_baking {with_texture_baking}..."
         )
         if "mesh" in outputs:
-            glb = postprocessing_utils.to_glb(
+            need_export_data = return_export_data or usd_path is not None
+            glb_result = postprocessing_utils.to_glb(
                 outputs["gaussian"][0],
                 outputs["mesh"][0],
                 # Optional parameters
@@ -550,7 +571,34 @@ class InferencePipeline:
                 with_texture_baking=with_texture_baking,
                 use_vertex_color=use_vertex_color,
                 rendering_engine=self.rendering_engine,
+                return_export_data=need_export_data,
             )
+
+            if need_export_data:
+                glb, export_data = glb_result
+                outputs["mesh_export_data"] = export_data
+                if usd_path is not None:
+                    try:
+                        postprocessing_utils.to_usd(
+                            export_data,
+                            usd_path,
+                            embed_textures=embed_textures,
+                            scale_factor=usd_scale_factor,
+                        )
+                        outputs["usd_path"] = usd_path
+                        # Also package USDZ with embedded texture for portability.
+                        usdz_path = Path(usd_path).with_suffix(".usdz")
+                        try:
+                            postprocessing_utils.to_usdz(str(usdz_path), usd_path)
+                            outputs["usdz_path"] = str(usdz_path)
+                        except Exception as e:
+                            logger.error("USDZ export failed: {}", e, exc_info=True)
+                            outputs["usdz_path"] = None
+                    except Exception as e:
+                        logger.error("USD export failed: {}", e, exc_info=True)
+                        outputs["usd_path"] = None
+            else:
+                glb = glb_result
 
         # glb.export("sample.glb")
         else:
