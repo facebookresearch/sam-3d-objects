@@ -2,9 +2,9 @@
 
 Convert 2D images into 3D USD assets which could directly used for Isaac Sim. This pipeline uses LangSplat for image segmentation and SAM 3D Objects for 3D reconstruction.
 
-![Input Image](doc/photo.png) → ![USD in Isaac Sim](doc/usd_in_isaac.png)
+<img src="doc/photo.png" height="280" alt="Input Image"> <img src="doc/usd_in_isaac.png" height="280" alt="USD in Isaac Sim">
 
-Based on [PR #38](https://github.com/facebookresearch/sam-3d-objects/pull/38) and [segment-anything-langsplat](https://github.com/minghanqin/segment-anything-langsplat). Tested on Ubuntu 24.04 + RTX 5090.
+Based on [facebookresearch/sam-3d-objects/pull/38](https://github.com/facebookresearch/sam-3d-objects/pull/38) and [segment-anything-langsplat](https://github.com/minghanqin/segment-anything-langsplat). Tested on Ubuntu 24.04 + RTX 5090.
 
 ## Overview
 
@@ -23,7 +23,7 @@ LangSplat automatically finds objects in images and creates masks. It generates 
 
 **LangSplat segmentation (l mode) vs default segmentation:**
 
-![LangSplat Segmentation](doc/segments_l.png) | ![Default Segmentation](doc/segments_default.png)
+<img src="doc/segments_l.png" width="350" alt="LangSplat Segmentation"> | <img src="doc/segments_default.png" width="350" alt="Default Segmentation">
 :---: | :---:
 LangSplat (l mode) | Default
 
