@@ -609,6 +609,7 @@ def to_glb(
         debug (bool): Whether to print debug information.
         verbose (bool): Whether to print progress.
     """
+    rendering_engine = "nvdiffrast"
     vertices = mesh.vertices.float().cpu().numpy()
     faces = mesh.faces.cpu().numpy()
     vert_colors = mesh.vertex_attrs[:, :3].cpu().numpy()
@@ -631,6 +632,7 @@ def to_glb(
 
     if with_texture_baking:
         # parametrize mesh
+        logger.info("Parametrizing mesh ...")
         vertices, faces, uvs = parametrize_mesh(vertices, faces)
         logger.info("Baking texture ...")
 

@@ -22,7 +22,7 @@ def set_attention_backend():
 
 set_attention_backend()
 
-from typing import List, Union
+from typing import List, Union, Optional, Literal
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import numpy as np
@@ -94,7 +94,7 @@ class InferencePipeline:
         slat_mean=SLAT_MEAN,
         slat_std=SLAT_STD,
     ):
-        self.rendering_engine = rendering_engine
+        self.rendering_engine = "nvdiffrast"
         self.device = torch.device(device)
         self.compile_model = compile_model
         logger.info(f"self.device: {self.device}")
@@ -548,8 +548,8 @@ class InferencePipeline:
                 simplify=0.95,  # Ratio of triangles to remove in the simplification process
                 texture_size=1024,  # Size of the texture used for the GLB
                 verbose=False,
-                with_mesh_postprocess=with_mesh_postprocess,
-                with_texture_baking=with_texture_baking,
+                with_mesh_postprocess=True,
+                with_texture_baking=True,
                 use_vertex_color=use_vertex_color,
                 rendering_engine=self.rendering_engine,
             )
