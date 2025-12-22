@@ -1,1 +1,12 @@
 __pycache__
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Backend
+backend/__pycache__/
+
+# Build artifacts
+*.pyc
+.DS_Store
