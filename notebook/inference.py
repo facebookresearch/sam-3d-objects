@@ -2,7 +2,16 @@
 import os
 
 # not ideal to put that here
-os.environ["CUDA_HOME"] = os.environ["CONDA_PREFIX"]
+# Prefer an existing CUDA_HOME, otherwise fall back to conda prefix or torch's detected CUDA path.
+_cuda_home = os.environ.get("CUDA_HOME") or os.environ.get("CONDA_PREFIX")
+if not _cuda_home:
+    try:
+        from torch.utils.cpp_extension import CUDA_HOME as _torch_cuda_home
+    except Exception:
+        _torch_cuda_home = None
+    _cuda_home = _torch_cuda_home
+if _cuda_home:
+    os.environ["CUDA_HOME"] = _cuda_home
 os.environ["LIDRA_SKIP_INIT"] = "true"
 
 import sys
