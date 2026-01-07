@@ -5,7 +5,6 @@ import torch
 from collections.abc import Iterable
 import inspect
 import ast
-import astor
 from torch.utils import _pytree
 
 # None = root, Iterable[Any] = path, Any = path of one
@@ -215,7 +214,7 @@ def _get_caller_arg_name(argnum=0, parent_frame=1):
                 break  # only get the first parent call
 
         # get first argument string (do not handle '=')
-        label = astor.to_source(args[argnum]).strip()
+        label = ast.unparse(args[argnum]).strip()
     except:
         # TODO(Pierre) log exception
         label = "{label}"

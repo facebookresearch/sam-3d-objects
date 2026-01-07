@@ -11,7 +11,6 @@ import numpy as np
 import torch
 import trimesh
 from PIL import Image
-import torch.nn.functional as F
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import PerspectiveCameras, RasterizationSettings, MeshRasterizer, TexturesVertex
 from moge.model.v1 import MoGeModel

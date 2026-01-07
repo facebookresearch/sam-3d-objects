@@ -15,7 +15,6 @@
 # limitations under the License.
 import torch
 from .tables import *
-from kaolin.utils.testing import check_tensor
 
 __all__ = [
     'FlexiCubes'
@@ -56,29 +55,18 @@ class FlexiCubes:
 
     def __call__(self, voxelgrid_vertices, scalar_field, cube_idx, resolution, qef_reg_scale=1e-3,
                  weight_scale=0.99, beta=None, alpha=None, gamma_f=None, voxelgrid_colors=None, training=False):
-        assert torch.is_tensor(voxelgrid_vertices) and \
-            check_tensor(voxelgrid_vertices, (None, 3), throw=False), \
-            "'voxelgrid_vertices' should be a tensor of shape (num_vertices, 3)"
-        num_vertices = voxelgrid_vertices.shape[0]
-        assert torch.is_tensor(scalar_field) and \
-            check_tensor(scalar_field, (num_vertices,), throw=False), \
-            "'scalar_field' should be a tensor of shape (num_vertices,)"
-        assert torch.is_tensor(cube_idx) and \
-            check_tensor(cube_idx, (None, 8), throw=False), \
-            "'cube_idx' should be a tensor of shape (num_cubes, 8)"
+        assert voxelgrid_vertices.ndim == 2 and voxelgrid_vertices.shape[1] == 3, "voxelgrid_vertices must be (N, 3)"
+        assert scalar_field.shape == (voxelgrid_vertices.shape[0],), "scalar_field must be (N,)"
+
+        assert cube_idx.ndim == 2 and cube_idx.shape[1] == 8, "cube_idx must be (M, 8)"
         num_cubes = cube_idx.shape[0]
-        assert beta is None or (
-            torch.is_tensor(beta) and
-            check_tensor(beta, (num_cubes, 12), throw=False)
-        ), "'beta' should be a tensor of shape (num_cubes, 12)"
-        assert alpha is None or (
-            torch.is_tensor(alpha) and
-            check_tensor(alpha, (num_cubes, 8), throw=False)
-        ), "'alpha' should be a tensor of shape (num_cubes, 8)"
-        assert gamma_f is None or (
-            torch.is_tensor(gamma_f) and
-            check_tensor(gamma_f, (num_cubes,), throw=False)
-        ), "'gamma_f' should be a tensor of shape (num_cubes,)"
+
+        if beta is not None:
+            assert beta.shape == (num_cubes, 12), "beta must be (M, 12)"
+        if alpha is not None:
+            assert alpha.shape == (num_cubes, 8), "alpha must be (M, 8)"
+        if gamma_f is not None:
+            assert gamma_f.shape == (num_cubes,), "gamma_f must be (M,)"
 
         surf_cubes, occ_fx8 = self._identify_surf_cubes(scalar_field, cube_idx)
         if surf_cubes.sum() == 0:

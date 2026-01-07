@@ -1,4 +1,3 @@
-kaolin==0.17.0
 gsplat @ git+https://github.com/nerfstudio-project/gsplat.git@2323de5905d5e90e035f792fe65bad0fedd413e7
 seaborn==0.13.2
 gradio==5.49.0
