@@ -20,7 +20,6 @@ torchvision
 torchaudio
 kaolin==0.17.0
 gsplat @ git+https://github.com/nerfstudio-project/gsplat.git@2323de5905d5e90e035f792fe65bad0fedd413e7
-pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git@75ebeeaea0908c5527e7b1e305fbc7681382db47
 xformers
 spconv-cu121
 open3d
