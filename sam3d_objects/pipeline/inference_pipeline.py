@@ -643,7 +643,7 @@ class InferencePipeline:
 
     def sample_sparse_structure(
         self, ss_input_dict: dict, inference_steps=None, use_distillation=False,
-        intrinsics=None,
+        intrinsics=None, guidance=None,
     ):
         ss_generator = self.models["ss_generator"]
         ss_decoder = self.models["ss_decoder"]
@@ -730,6 +730,17 @@ class InferencePipeline:
                         },
                         os.path.join(steps_dir, f"step_{t_step:.3f}.pt"),
                     )
+
+                    if guidance is not None and intrinsics is not None:
+                        ss_step = guidance.apply(
+                            ss_step,
+                            pose_step["rotation"],
+                            pose_step["translation"],
+                            pose_step["scale"],
+                            intrinsics,
+                            float(t_step),
+                        )
+                        coords_step = torch.argwhere(ss_step > 0)[:, [0, 2, 3, 4]].int()
 
                 return_dict = x_t  # final step = denoised latent
                 if not self.is_mm_dit():
