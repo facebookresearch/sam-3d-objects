@@ -19,3 +19,6 @@ outputs/
 
 # Personal planning docs (not for the team fork)
 sam3d_evaluation_plan.md
+
+# Evaluation datasets (symlinks to /scratch-shared/$USER/eval/)
+data/eval/
