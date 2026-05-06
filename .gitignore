@@ -16,3 +16,6 @@ checkpoints/hf/
 checkpoints/hf-download/
 splat*.ply
 outputs/
+
+# Personal planning docs (not for the team fork)
+sam3d_evaluation_plan.md
