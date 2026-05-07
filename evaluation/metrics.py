@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from pytorch3d.ops import knn_points, sample_points_from_meshes
 from pytorch3d.structures import Meshes
+from scipy.optimize import linear_sum_assignment
 
 from evaluation.voxelize import voxelize_points
 
@@ -101,3 +102,31 @@ def voxel_iou(points_a: torch.Tensor, points_b: torch.Tensor, res: int = 64) -> 
     intersection = int((g_a & g_b).sum())
     union = int((g_a | g_b).sum())
     return intersection / union if union > 0 else 0.0
+
+
+def emd(
+    points_a: torch.Tensor,
+    points_b: torch.Tensor,
+    n_subsample: int = 2000,
+    seed: int = 0,
+) -> float:
+    """Earth Mover's Distance via exact Hungarian assignment on a subsampled point set.
+
+    Uniformly subsamples ``n_subsample`` points without replacement from each cloud,
+    builds the pairwise L2 distance matrix, and returns the mean matched distance from
+    the optimal assignment. EMD on 1M points is O(n^3) Hungarian and intractable; SAM 3D
+    paper §D.3.1 follows the standard practice of subsampling. Deterministic given ``seed``.
+
+    If either cloud has fewer than ``n_subsample`` points, both are subsampled to the
+    smaller size so the assignment remains square.
+    """
+    rng = np.random.default_rng(seed)
+    n = min(n_subsample, points_a.shape[0], points_b.shape[0])
+    idx_a = rng.choice(points_a.shape[0], size=n, replace=False)
+    idx_b = rng.choice(points_b.shape[0], size=n, replace=False)
+
+    a = points_a[torch.as_tensor(idx_a, device=points_a.device)]
+    b = points_b[torch.as_tensor(idx_b, device=points_b.device)]
+    cost = torch.cdist(a, b).detach().cpu().numpy()
+    row_ind, col_ind = linear_sum_assignment(cost)
+    return float(cost[row_ind, col_ind].mean())
