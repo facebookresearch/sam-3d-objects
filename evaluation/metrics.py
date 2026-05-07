@@ -7,6 +7,8 @@ import torch
 from pytorch3d.ops import knn_points, sample_points_from_meshes
 from pytorch3d.structures import Meshes
 
+from evaluation.voxelize import voxelize_points
+
 
 def sample_points(
     verts: np.ndarray,
@@ -86,3 +88,16 @@ def f_score(
         f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
         out[float(tau)] = f1
     return out
+
+
+def voxel_iou(points_a: torch.Tensor, points_b: torch.Tensor, res: int = 64) -> float:
+    """Voxel IoU between two point clouds at resolution ``res`` over the [-1, 1] cube.
+
+    Voxelizes both clouds (surface voxelization — see ``voxelize_points``), then returns
+    ``|A ∩ B| / |A ∪ B|``. Returns 0.0 if both grids are empty (degenerate input).
+    """
+    g_a = voxelize_points(points_a, resolution=res)
+    g_b = voxelize_points(points_b, resolution=res)
+    intersection = int((g_a & g_b).sum())
+    union = int((g_a | g_b).sum())
+    return intersection / union if union > 0 else 0.0
