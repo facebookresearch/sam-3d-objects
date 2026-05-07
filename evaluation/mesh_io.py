@@ -17,10 +17,11 @@ def load_mesh(path: str | Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def normalize_mesh(verts: np.ndarray) -> np.ndarray:
-    """Center the axis-aligned bbox at the origin and scale so the longest dim equals 1.0.
+    """Center the axis-aligned bbox at the origin and scale so the longest dim equals 2.0.
 
-    This is the convention assumed by F-score thresholds like F1@0.01 — it must be applied
-    to both meshes before any metric.
+    Maps the mesh into the [-1, 1] cube — the convention used by SAM 3D paper §D.3.1
+    and assumed by F-score thresholds like F1@0.01. Must be applied to both meshes
+    independently before alignment / metrics.
     """
     bbox_min = verts.min(axis=0)
     bbox_max = verts.max(axis=0)
@@ -29,7 +30,7 @@ def normalize_mesh(verts: np.ndarray) -> np.ndarray:
     # single-point mesh would divide by zero here; we don't guard because real
     # loaded meshes always have extent and a silent inf is easier to debug than
     # a wrong-but-finite answer from a fallback.
-    scale = 1.0 / (bbox_max - bbox_min).max()
+    scale = 2.0 / (bbox_max - bbox_min).max()
     return (verts - center) * scale
 
 
