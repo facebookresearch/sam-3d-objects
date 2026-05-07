@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-from pytorch3d.ops import sample_points_from_meshes
+from pytorch3d.ops import knn_points, sample_points_from_meshes
 from pytorch3d.structures import Meshes
 
 
@@ -37,3 +37,24 @@ def sample_points(
             torch.cuda.manual_seed_all(seed)
         points = sample_points_from_meshes(mesh, num_samples=n)
     return points[0]
+
+
+def chamfer(points_a: torch.Tensor, points_b: torch.Tensor) -> float:
+    """Symmetric Chamfer distance — mean of *unsquared* L2 nearest-neighbor distances.
+
+    chamfer = (mean_{a in A} min_{b in B} ||a - b||_2
+            +  mean_{b in B} min_{a in A} ||a - b||_2) / 2
+
+    PyTorch3D's ``knn_points`` returns squared L2 distances; we ``sqrt`` before
+    averaging so the value range matches the SAM 3D paper §D.3.1 (their full model
+    scores 0.0400 on SA-3DAO at this convention; the squared version is ~10× smaller
+    and would not be comparable).
+
+    Inputs are ``(N, 3)`` and ``(M, 3)`` float tensors on the same device; N and M
+    may differ.
+    """
+    a = points_a.unsqueeze(0)
+    b = points_b.unsqueeze(0)
+    d_a_to_b = knn_points(a, b, K=1).dists.squeeze(-1).squeeze(0).clamp_min(0.0).sqrt()
+    d_b_to_a = knn_points(b, a, K=1).dists.squeeze(-1).squeeze(0).clamp_min(0.0).sqrt()
+    return float((d_a_to_b.mean() + d_b_to_a.mean()) / 2.0)
