@@ -58,3 +58,31 @@ def chamfer(points_a: torch.Tensor, points_b: torch.Tensor) -> float:
     d_a_to_b = knn_points(a, b, K=1).dists.squeeze(-1).squeeze(0).clamp_min(0.0).sqrt()
     d_b_to_a = knn_points(b, a, K=1).dists.squeeze(-1).squeeze(0).clamp_min(0.0).sqrt()
     return float((d_a_to_b.mean() + d_b_to_a.mean()) / 2.0)
+
+
+def f_score(
+    points_a: torch.Tensor,
+    points_b: torch.Tensor,
+    thresholds: tuple[float, ...] = (0.005, 0.01, 0.02, 0.05),
+) -> dict[float, float]:
+    """F1 score at each threshold τ in unsquared L2 distance units.
+
+    For each τ:
+        precision = fraction of A-points within τ of any B-point
+        recall    = fraction of B-points within τ of any A-point
+        f1        = 2 * P * R / (P + R)   (0 when P = R = 0)
+
+    Returns ``{τ: f1}``. Conventionally A = prediction, B = ground truth; F1 itself
+    is symmetric in (A, B), only P and R swap.
+    """
+    a = points_a.unsqueeze(0)
+    b = points_b.unsqueeze(0)
+    d_a = knn_points(a, b, K=1).dists.squeeze(-1).squeeze(0).clamp_min(0.0).sqrt()
+    d_b = knn_points(b, a, K=1).dists.squeeze(-1).squeeze(0).clamp_min(0.0).sqrt()
+    out: dict[float, float] = {}
+    for tau in thresholds:
+        precision = float((d_a < tau).float().mean())
+        recall = float((d_b < tau).float().mean())
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+        out[float(tau)] = f1
+    return out
