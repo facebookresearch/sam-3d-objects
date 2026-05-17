@@ -1,7 +1,5 @@
 # Stage 1 Guidance for SAM 3D
 
-This document explains how to run inference with our custom guidance and what it actually does under the hood.
-
 ---
 
 ## Quick start
@@ -26,7 +24,7 @@ Outputs land in `outputs/my_run/`:
 
 ---
 
-## All arguments
+## Arguments
 
 | Flag | Default | Description |
 |---|---|---|
@@ -35,9 +33,9 @@ Outputs land in `outputs/my_run/`:
 | `--prefix` | required | Output folder name under `outputs/` |
 | `--seed` | `42` | RNG seed for reproducibility |
 | `--tag` | `hf` | Checkpoint folder under `checkpoints/` |
-| `--ss-guidance-scale` | off | Shape guidance strength (try 5–50) |
-| `--pose-guidance-scale` | off | Pose guidance strength (try 0.05–1.0) |
-| `--depth-guidance-scale` | off | Depth guidance strength (try 5–50); requires `--depth-map` |
+| `--ss-guidance-scale` | off | Shape guidance strength |
+| `--pose-guidance-scale` | off | Pose guidance strength |
+| `--depth-guidance-scale` | off | Depth guidance strength; requires `--depth-map` |
 | `--depth-map` | off | Path to `depth.npy` from Open3DHOI |
 | `--w-centroid` | `1.0` | Weight for centroid term inside pose guidance |
 | `--w-size` | `1.0` | Weight for size term inside pose guidance |
@@ -64,17 +62,15 @@ python main.py --image ... --mask ... --prefix full_guidance --seed 42 \
 
 ---
 
-## Running on Snellius (SLURM)
+## Running on Snellius
 
-Use the provided job file — it runs baseline and guided back-to-back on the same sample:
+The job file runs baseline and guided back-to-back on the same sample:
 
 ```bash
 mkdir -p logs
 sbatch jobs/05_guidance_test.job
 tail -f logs/sam_guidance_test_<JOBID>.out
 ```
-
-The job file currently requests `gpu_a100`. You can change the `--partition` line to `gpu_h100` if you want to use an H100 instead — both work.
 
 ---
 
@@ -109,8 +105,6 @@ This is sometimes called **guidance by latent correction** — similar in spirit
 4. Computes `loss = 1 - IoU(rendered, gt_mask)`
 5. Backpropagates to get `∂loss/∂x_t["shape"]`, applies a unit-norm gradient step
 
-Higher `--ss-guidance-scale` = stronger pull toward the mask silhouette.
-
 ### PoseGuidance (`--pose-guidance-scale`)
 
 **Signal:** centroid position and bounding-box area of the predicted silhouette vs the GT mask.
@@ -124,8 +118,6 @@ Higher `--ss-guidance-scale` = stronger pull toward the mask silhouette.
    - Centroid loss: L2 distance between predicted and GT mask centroid (normalized by image width)
    - Size loss: squared relative error between predicted and GT mask area
 4. Separate gradients flow to translation and scale latents
-
-Note: rotation is not corrected — centroid and size give no meaningful rotation signal.
 
 ### DepthGuidance (`--depth-guidance-scale`)
 
@@ -143,13 +135,30 @@ Requires `--depth-map` pointing to the `depth.npy` file from Open3DHOI.
 
 ### CompositeGuidance
 
-All three modules can run together. Each module sees the same `x_t` (corrections don't chain within a step). If two modules correct the same key (e.g. both `ShapeGuidance` and `DepthGuidance` correct `x_t["shape"]`), their gradient steps are summed additively.
+All three modules can run together. Each module sees the same `x_t` (corrections don't chain within a step). If two modules correct the same key, their corrections are merged after all modules finish.
 
 ---
 
-## Tuning tips
+## Design choices
 
-- Start with just one guidance type at a time to understand each signal independently.
-- Shape and depth scales (5–50) are typically much larger than pose scale (0.05–1.0) — they operate on different latent spaces with different magnitudes.
-- Debug images for `ShapeGuidance` are saved to `outputs/<prefix>/guidance_debug/shape/` (pred / GT / overlap per step) — useful to see if the silhouette is converging.
-- If you see `empty mesh — skipping` in the logs for many steps, the shape latent hasn't formed a surface yet; try lowering `--ss-guidance-scale` or using it with `--pose-guidance-scale` to first get the object in the right place.
+**Unit-norm gradient step.** The correction applied at each step is:
+```python
+g = grad / (grad.norm() + 1e-8)
+x_t_corrected = x_t - scale * g
+```
+The gradient is normalized before scaling, so `scale` is a literal step size regardless of gradient magnitude. This keeps the hyperparameter interpretable and stable across ODE timesteps.
+
+**Additive delta composition.** In `CompositeGuidance`, when two modules correct the same key (e.g. both `ShapeGuidance` and `DepthGuidance` write to `x_t["shape"]`), their corrections accumulate as deltas from the original:
+```python
+corrections[key] = corrections[key] + val - x_t[key]
+# → x_t_final = x_t_original + Δ_shape + Δ_depth
+```
+Each module sees the unmodified `x_t`, so neither gradient computation is contaminated by the other's correction within the same step.
+
+**Partial gradient isolation.** Each module holds fixed the latents it doesn't own: `ShapeGuidance` and `DepthGuidance` decode pose inside `torch.no_grad()`; `PoseGuidance` runs the shape decoder without grad. This prevents cross-contamination — shape gradients don't leak into pose and vice versa.
+
+**Scale-invariant depth loss.** Both predicted and GT depth maps are normalized to zero-mean unit-variance before MSE. The loss only cares about relative depth structure, not absolute scale — important because scene scale varies across samples.
+
+**Rotation excluded from PoseGuidance.** Centroid and size are 2D projective signals with no meaningful 3D rotation information. Correcting rotation from these losses would inject noise, so `x_t["6drotation_normalized"]` is intentionally left untouched.
+
+**`@torch.enable_grad()` inside `torch.no_grad()`.** The ODE loop runs under `torch.no_grad()` for speed. Guidance `apply()` methods are decorated with `@torch.enable_grad()`, which locally re-enables autograd only for the guidance computation. Gradient overhead is zero when guidance is not used.
