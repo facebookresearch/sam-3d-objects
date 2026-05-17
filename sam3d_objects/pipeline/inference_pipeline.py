@@ -642,8 +642,13 @@ class InferencePipeline:
         return condition_args, condition_kwargs
 
     def sample_sparse_structure(
-        self, ss_input_dict: dict, inference_steps=None, use_distillation=False,
-        intrinsics=None, guidance=None,
+        self,
+        ss_input_dict: dict,
+        inference_steps=None,
+        use_distillation=False,
+        intrinsics=None,
+        steps_prefix: str = None,
+        guidance=None,
     ):
         ss_generator = self.models["ss_generator"]
         ss_decoder = self.models["ss_decoder"]
@@ -672,7 +677,9 @@ class InferencePipeline:
         )
 
         with torch.no_grad():
-            with torch.autocast(device_type="cuda", dtype=self.shape_model_dtype):
+            # Setup: latent shape and condition embeddings under inference_mode for speed.
+            # The iteration loop runs outside inference_mode so guidance can use autograd.
+            with torch.inference_mode():
                 if self.is_mm_dit():
                     latent_shape_dict = {
                         k: (bs,) + (v.pos_emb.shape[0], v.input_layer.in_features)
@@ -687,81 +694,86 @@ class InferencePipeline:
                     self.ss_condition_input_mapping,
                 )
 
-                steps_dir = os.path.join(getattr(self, "cache_dir", ".cache"), "ss_steps")
-                os.makedirs(steps_dir, exist_ok=True)
+            steps_dir = os.path.join(
+                "outputs",
+                steps_prefix if steps_prefix else "ss_steps",
+            )
+            os.makedirs(steps_dir, exist_ok=True)
 
-                for t_step, x_t, _ in ss_generator.generate_iter(
-                    latent_shape_dict,
-                    image.device,
-                    *condition_args,
-                    **condition_kwargs,
-                ):
-                    if not self.is_mm_dit():
-                        x_t = {"shape": x_t}
+            for t_step, x_t, _ in ss_generator.generate_iter(
+                latent_shape_dict,
+                image.device,
+                *condition_args,
+                **condition_kwargs,
+            ):
+                if not self.is_mm_dit():
+                    x_t = {"shape": x_t}
 
-                    shape_latent_step = x_t["shape"]
-                    ss_step = ss_decoder(
-                        shape_latent_step.permute(0, 2, 1)
-                        .contiguous()
-                        .view(shape_latent_step.shape[0], 8, 16, 16, 16)
-                    )
-                    coords_step = torch.argwhere(ss_step > 0)[:, [0, 2, 3, 4]].int()
-
-                    pose_step = self.pose_decoder(
+                # Guidance: each module checks its own start_t internally.
+                if guidance is not None and intrinsics is not None:
+                    corrections = guidance.apply(
                         x_t,
+                        ss_decoder,
+                        self.pose_decoder,
+                        intrinsics,
                         scene_scale=ss_input_dict.get("pointmap_scale", None),
                         scene_shift=ss_input_dict.get("pointmap_shift", None),
+                        t_step=float(t_step),
                     )
-                    torch.save(
-                        {
-                            "t_step": t_step,
-                            "ss_grid": ss_step.cpu(),
-                            "coords": coords_step.cpu(),
-                            "voxel": coords_step.cpu()[:, 1:].float() / 64 - 0.5,
-                            "intrinsics": intrinsics,
-                            "latent_shape": x_t["shape"].cpu(),
-                            "latent_translation": x_t["translation"].cpu(),
-                            "latent_rotation": x_t["6drotation_normalized"].cpu(),
-                            "latent_scale": x_t["scale"].cpu(),
-                            "latent_translation_scale": x_t["translation_scale"].cpu(),
-                            "pose_translation": pose_step["translation"].cpu(),
-                            "pose_rotation": pose_step["rotation"].cpu(),
-                            "pose_scale": pose_step["scale"].cpu(),
-                        },
-                        os.path.join(steps_dir, f"step_{t_step:.3f}.pt"),
-                    )
+                    for key, val in corrections.items():
+                        x_t[key].data.copy_(val)
 
-                    if guidance is not None and intrinsics is not None:
-                        ss_step = guidance.apply(
-                            ss_step,
-                            pose_step["rotation"],
-                            pose_step["translation"],
-                            pose_step["scale"],
-                            intrinsics,
-                            float(t_step),
-                        )
-                        coords_step = torch.argwhere(ss_step > 0)[:, [0, 2, 3, 4]].int()
-
-                return_dict = x_t  # final step = denoised latent
-                if not self.is_mm_dit():
-                    return_dict = {"shape": return_dict["shape"]}
-
-                coords = coords_step  # reuse last iteration's result
-
-                # downsample output
-                return_dict["coords_original"] = coords
-                original_shape = coords.shape
-                if self.downsample_ss_dist > 0:
-                    coords = prune_sparse_structure(
-                        coords,
-                        max_neighbor_axes_dist=self.downsample_ss_dist,
-                    )
-                coords, downsample_factor = downsample_sparse_structure(coords)
-                logger.info(
-                    f"Downsampled coords from {original_shape[0]} to {coords.shape[0]}"
+                shape_latent_step = x_t["shape"]
+                ss_step = ss_decoder(
+                    shape_latent_step.permute(0, 2, 1)
+                    .contiguous()
+                    .view(shape_latent_step.shape[0], 8, 16, 16, 16)
                 )
-                return_dict["coords"] = coords
-                return_dict["downsample_factor"] = downsample_factor
+                coords_step = torch.argwhere(ss_step > 0)[:, [0, 2, 3, 4]].int()
+
+                pose_step = self.pose_decoder(
+                    x_t,
+                    scene_scale=ss_input_dict.get("pointmap_scale", None),
+                    scene_shift=ss_input_dict.get("pointmap_shift", None),
+                )
+                torch.save(
+                    {
+                        "t_step": t_step,
+                        "ss_grid": ss_step.cpu(),
+                        "coords": coords_step.cpu(),
+                        "voxel": coords_step.cpu()[:, 1:].float() / 64 - 0.5,
+                        "intrinsics": intrinsics,
+                        "latent_shape": x_t["shape"].cpu(),
+                        "latent_translation": x_t.get("translation", torch.zeros(1)).cpu(),
+                        "latent_rotation": x_t.get("6drotation_normalized", torch.zeros(1)).cpu(),
+                        "latent_scale": x_t.get("scale", torch.zeros(1)).cpu(),
+                        "latent_translation_scale": x_t.get("translation_scale", torch.zeros(1)).cpu(),
+                        "pose_translation": pose_step.get("translation", torch.zeros(1)).cpu(),
+                        "pose_rotation": pose_step.get("rotation", torch.zeros(1)).cpu(),
+                        "pose_scale": pose_step.get("scale", torch.zeros(1)).cpu(),
+                    },
+                    os.path.join(steps_dir, f"step_{t_step:.3f}.pt"),
+                )
+
+            return_dict = x_t
+            if not self.is_mm_dit():
+                return_dict = {"shape": return_dict["shape"]}
+            coords = coords_step
+
+            # downsample output
+            return_dict["coords_original"] = coords
+            original_shape = coords.shape
+            if self.downsample_ss_dist > 0:
+                coords = prune_sparse_structure(
+                    coords,
+                    max_neighbor_axes_dist=self.downsample_ss_dist,
+                )
+            coords, downsample_factor = downsample_sparse_structure(coords)
+            logger.info(
+                f"Downsampled coords from {original_shape[0]} to {coords.shape[0]}"
+            )
+            return_dict["coords"] = coords
+            return_dict["downsample_factor"] = downsample_factor
 
         ss_generator.inference_steps = prev_inference_steps
         return return_dict

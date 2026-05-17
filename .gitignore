@@ -16,3 +16,4 @@ checkpoints/hf/
 checkpoints/hf-download/
 splat*.ply
 outputs/
+data
