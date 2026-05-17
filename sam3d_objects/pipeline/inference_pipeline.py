@@ -700,60 +700,61 @@ class InferencePipeline:
             )
             os.makedirs(steps_dir, exist_ok=True)
 
-            for t_step, x_t, _ in ss_generator.generate_iter(
-                latent_shape_dict,
-                image.device,
-                *condition_args,
-                **condition_kwargs,
-            ):
-                if not self.is_mm_dit():
-                    x_t = {"shape": x_t}
+            with torch.autocast(device_type="cuda", dtype=self.shape_model_dtype):
+                for t_step, x_t, _ in ss_generator.generate_iter(
+                    latent_shape_dict,
+                    image.device,
+                    *condition_args,
+                    **condition_kwargs,
+                ):
+                    if not self.is_mm_dit():
+                        x_t = {"shape": x_t}
 
-                # Guidance: each module checks its own start_t internally.
-                if guidance is not None and intrinsics is not None:
-                    corrections = guidance.apply(
+                    # Guidance: each module checks its own start_t internally.
+                    if guidance is not None and intrinsics is not None:
+                        corrections = guidance.apply(
+                            x_t,
+                            ss_decoder,
+                            self.pose_decoder,
+                            intrinsics,
+                            scene_scale=ss_input_dict.get("pointmap_scale", None),
+                            scene_shift=ss_input_dict.get("pointmap_shift", None),
+                            t_step=float(t_step),
+                        )
+                        for key, val in corrections.items():
+                            x_t[key].data.copy_(val)
+
+                    shape_latent_step = x_t["shape"]
+                    ss_step = ss_decoder(
+                        shape_latent_step.permute(0, 2, 1)
+                        .contiguous()
+                        .view(shape_latent_step.shape[0], 8, 16, 16, 16)
+                    )
+                    coords_step = torch.argwhere(ss_step > 0)[:, [0, 2, 3, 4]].int()
+
+                    pose_step = self.pose_decoder(
                         x_t,
-                        ss_decoder,
-                        self.pose_decoder,
-                        intrinsics,
                         scene_scale=ss_input_dict.get("pointmap_scale", None),
                         scene_shift=ss_input_dict.get("pointmap_shift", None),
-                        t_step=float(t_step),
                     )
-                    for key, val in corrections.items():
-                        x_t[key].data.copy_(val)
-
-                shape_latent_step = x_t["shape"]
-                ss_step = ss_decoder(
-                    shape_latent_step.permute(0, 2, 1)
-                    .contiguous()
-                    .view(shape_latent_step.shape[0], 8, 16, 16, 16)
-                )
-                coords_step = torch.argwhere(ss_step > 0)[:, [0, 2, 3, 4]].int()
-
-                pose_step = self.pose_decoder(
-                    x_t,
-                    scene_scale=ss_input_dict.get("pointmap_scale", None),
-                    scene_shift=ss_input_dict.get("pointmap_shift", None),
-                )
-                torch.save(
-                    {
-                        "t_step": t_step,
-                        "ss_grid": ss_step.cpu(),
-                        "coords": coords_step.cpu(),
-                        "voxel": coords_step.cpu()[:, 1:].float() / 64 - 0.5,
-                        "intrinsics": intrinsics,
-                        "latent_shape": x_t["shape"].cpu(),
-                        "latent_translation": x_t.get("translation", torch.zeros(1)).cpu(),
-                        "latent_rotation": x_t.get("6drotation_normalized", torch.zeros(1)).cpu(),
-                        "latent_scale": x_t.get("scale", torch.zeros(1)).cpu(),
-                        "latent_translation_scale": x_t.get("translation_scale", torch.zeros(1)).cpu(),
-                        "pose_translation": pose_step.get("translation", torch.zeros(1)).cpu(),
-                        "pose_rotation": pose_step.get("rotation", torch.zeros(1)).cpu(),
-                        "pose_scale": pose_step.get("scale", torch.zeros(1)).cpu(),
-                    },
-                    os.path.join(steps_dir, f"step_{t_step:.3f}.pt"),
-                )
+                    torch.save(
+                        {
+                            "t_step": t_step,
+                            "ss_grid": ss_step.cpu(),
+                            "coords": coords_step.cpu(),
+                            "voxel": coords_step.cpu()[:, 1:].float() / 64 - 0.5,
+                            "intrinsics": intrinsics,
+                            "latent_shape": x_t["shape"].cpu(),
+                            "latent_translation": x_t.get("translation", torch.zeros(1)).cpu(),
+                            "latent_rotation": x_t.get("6drotation_normalized", torch.zeros(1)).cpu(),
+                            "latent_scale": x_t.get("scale", torch.zeros(1)).cpu(),
+                            "latent_translation_scale": x_t.get("translation_scale", torch.zeros(1)).cpu(),
+                            "pose_translation": pose_step.get("translation", torch.zeros(1)).cpu(),
+                            "pose_rotation": pose_step.get("rotation", torch.zeros(1)).cpu(),
+                            "pose_scale": pose_step.get("scale", torch.zeros(1)).cpu(),
+                        },
+                        os.path.join(steps_dir, f"step_{t_step:.3f}.pt"),
+                    )
 
             return_dict = x_t
             if not self.is_mm_dit():
