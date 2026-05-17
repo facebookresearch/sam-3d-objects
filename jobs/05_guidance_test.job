@@ -1,0 +1,58 @@
+#!/bin/bash
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=sam_guidance_test
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=9
+#SBATCH --mem=64G
+#SBATCH --time=01:00:00
+#SBATCH --output=logs/sam_guidance_test_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+module load CUDA/12.1.1 2>/dev/null || true
+
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate sam3d-objects
+
+cd "$HOME/sam-3d-objects"
+export LIDRA_SKIP_INIT=1
+
+IMAGE="data/Open3DHOI/data/tennis racket/2344062/image.jpg"
+MASK="data/Open3DHOI/data/tennis racket/2344062/obj_mask.png"
+DEPTH="data/Open3DHOI/data/tennis racket/2344062/depth.npy"
+
+mkdir -p logs
+
+echo "=== GPU sanity ==="
+nvidia-smi
+python -c "import torch; print('CUDA:', torch.cuda.is_available(), '/', torch.cuda.get_device_name(0))"
+
+echo ""
+echo "=== Run 1: baseline (no guidance) ==="
+time python main.py \
+    --image "$IMAGE" \
+    --mask  "$MASK" \
+    --prefix "racket_baseline" \
+    --seed 42
+
+echo ""
+echo "=== Run 2: guided (shape=50.0, pose=0.5, depth=50.0) ==="
+time python main.py \
+    --image  "$IMAGE" \
+    --mask   "$MASK" \
+    --depth-map "$DEPTH" \
+    --prefix "racket_all_x50" \
+    --seed 42 \
+    --ss-guidance-scale    50.0 \
+    --pose-guidance-scale   0.5 \
+    --depth-guidance-scale 50.0
+
+echo ""
+echo "=== Output files ==="
+ls -lh outputs/racket_baseline/ outputs/racket_all_x50/
+
+echo "=== 05_guidance_test DONE ==="
