@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --partition=rome
+#SBATCH --job-name=sam_viz_steps
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=01:00:00
+#SBATCH --output=logs/sam_viz_steps_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+module load CUDA/12.1.1 2>/dev/null || true
+
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate sam3d-objects
+
+cd "$HOME/sam-3d-objects"
+
+SAMPLE_DIR="data/Open3DHOI/data/coffee cup/drinking_98"
+MASK="${SAMPLE_DIR}/obj_mask.png"
+IMAGE="${SAMPLE_DIR}/image.jpg"
+DEPTH="${SAMPLE_DIR}/depth.npy"
+
+mkdir -p logs
+
+for cfg in baseline ss_0.1 ss_0.2 ss_0.5 pose_0.05 pose_0.1 pose_0.2 pose_0.5 depth_0.1 depth_0.2 depth_0.5; do
+    echo "=== Viz: ${cfg} ==="
+    python scripts/compare_steps.py \
+        --steps-dir outputs/sweep/${cfg}/coffee_cup \
+        --mask      "$MASK" \
+        --image     "$IMAGE" \
+        --depth-map "$DEPTH" \
+        --device    cpu
+    echo ""
+done
+
+echo "=== 09_viz_steps DONE ==="

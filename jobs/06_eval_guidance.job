@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=sam_eval_guidance
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=00:30:00
+#SBATCH --output=logs/sam_eval_guidance_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+module load CUDA/12.1.1 2>/dev/null || true
+
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate sam3d-objects
+
+cd "$HOME/sam-3d-objects"
+
+GT="data/Open3DHOI/data/tennis racket/2344062/object_mesh.obj"
+
+mkdir -p logs
+
+echo "=== Eval: baseline ==="
+python eval_single.py \
+    --pred outputs/racket_baseline/pred_points.npy \
+    --gt   "$GT" \
+    --device cuda
+
+echo ""
+echo "=== Eval: guided (shape=50, pose=0.5, depth=50) ==="
+python eval_single.py \
+    --pred outputs/racket_all_x50/pred_points.npy \
+    --gt   "$GT" \
+    --device cuda
+
+echo ""
+echo "=== 06_eval_guidance DONE ==="

@@ -3,6 +3,7 @@ import os
 import sys
 
 import numpy as np
+import trimesh
 
 sys.path.append("notebook")
 from inference import Inference, load_image, load_mask
@@ -153,6 +154,16 @@ def main():
         )
         output["gs"].save_ply(os.path.join(out_dir, "gaussian.ply"))
         print(f"Saved pred_points.npy and gaussian.ply to {out_dir}/")
+
+    if "mesh" in output:
+        mesh = output["mesh"][0]
+        if mesh.success:
+            tm = trimesh.Trimesh(
+                vertices=mesh.vertices.cpu().numpy(),
+                faces=mesh.faces.cpu().numpy(),
+            )
+            tm.export(os.path.join(out_dir, "pred_mesh.obj"))
+            print(f"Saved pred_mesh.obj to {out_dir}/")
 
     print(f"Done! Steps saved with prefix: {args.prefix}")
 
