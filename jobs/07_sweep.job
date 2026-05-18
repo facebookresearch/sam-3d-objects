@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=32G
-#SBATCH --time=01:00:00
+#SBATCH --time=01:30:00
 #SBATCH --output=logs/sam_sweep_%j.out
 
 set -eo pipefail
@@ -29,7 +29,7 @@ python -c "import torch; print('CUDA:', torch.cuda.is_available(), '/', torch.cu
 
 echo ""
 echo "=== Sweep ==="
-time python sweep.py --seed 42 --n-samples 1
+time python sweep.py --seed 42
 
 echo ""
 echo "=== 07_sweep DONE ==="

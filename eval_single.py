@@ -7,16 +7,24 @@ Usage:
 """
 
 import argparse
+import random
 
 import numpy as np
 import torch
 import trimesh
-from pytorch3d.ops import iterative_closest_point, knn_points
+from pytorch3d.ops import iterative_closest_point, knn_points, sample_points_from_meshes
 from pytorch3d.structures import Meshes
-from pytorch3d.ops import sample_points_from_meshes
+
+SEED = 42
 
 
-def load_gt_points(obj_path, n=100_000, seed=0, device="cuda"):
+def seed_everything(seed=SEED):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+def load_gt_points(obj_path, n=20_000, seed=0, device="cuda"):
     mesh = trimesh.load(obj_path, force="mesh", process=False)
     verts = np.asarray(mesh.vertices, dtype=np.float32)
     faces = np.asarray(mesh.faces, dtype=np.int64)
@@ -44,14 +52,34 @@ def align_icp(pred, gt, max_iterations=100):
 
 
 def chamfer(a, b):
-    d_ab = knn_points(a.unsqueeze(0), b.unsqueeze(0), K=1).dists.squeeze().clamp_min(0).sqrt()
-    d_ba = knn_points(b.unsqueeze(0), a.unsqueeze(0), K=1).dists.squeeze().clamp_min(0).sqrt()
+    d_ab = (
+        knn_points(a.unsqueeze(0), b.unsqueeze(0), K=1)
+        .dists.squeeze()
+        .clamp_min(0)
+        .sqrt()
+    )
+    d_ba = (
+        knn_points(b.unsqueeze(0), a.unsqueeze(0), K=1)
+        .dists.squeeze()
+        .clamp_min(0)
+        .sqrt()
+    )
     return float((d_ab.mean() + d_ba.mean()) / 2)
 
 
 def f_score(a, b, thresholds=(0.005, 0.01, 0.02, 0.05)):
-    d_a = knn_points(a.unsqueeze(0), b.unsqueeze(0), K=1).dists.squeeze().clamp_min(0).sqrt()
-    d_b = knn_points(b.unsqueeze(0), a.unsqueeze(0), K=1).dists.squeeze().clamp_min(0).sqrt()
+    d_a = (
+        knn_points(a.unsqueeze(0), b.unsqueeze(0), K=1)
+        .dists.squeeze()
+        .clamp_min(0)
+        .sqrt()
+    )
+    d_b = (
+        knn_points(b.unsqueeze(0), a.unsqueeze(0), K=1)
+        .dists.squeeze()
+        .clamp_min(0)
+        .sqrt()
+    )
     results = {}
     for tau in thresholds:
         p = float((d_a < tau).float().mean())
@@ -69,6 +97,7 @@ def main():
     args = parser.parse_args()
 
     device = args.device
+    seed_everything()
 
     print("Loading prediction...")
     pred = torch.from_numpy(np.load(args.pred)).float().to(device)
@@ -81,6 +110,7 @@ def main():
     gt = normalize(gt)
 
     if pred.shape[0] > gt.shape[0]:
+        torch.manual_seed(0)
         idx = torch.randperm(pred.shape[0], device=device)[:gt.shape[0]]
         pred = pred[idx]
 
@@ -91,11 +121,11 @@ def main():
     cd = chamfer(pred, gt)
     fs = f_score(pred, gt)
 
-    print(f"\n{'='*40}")
+    print(f"\n{'=' * 40}")
     print(f"Chamfer Distance:  {cd:.4f}")
     for tau, f1 in fs.items():
         print(f"F-score @ {tau:.3f}:   {f1:.4f}")
-    print(f"{'='*40}\n")
+    print(f"{'=' * 40}\n")
 
 
 if __name__ == "__main__":

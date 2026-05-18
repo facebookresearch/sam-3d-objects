@@ -26,16 +26,9 @@ from main import build_guidance
 DATA = "data/Open3DHOI/data"
 
 SAMPLES = [
-    {"name": "coffee_cup",  "dir": f"{DATA}/coffee cup/drinking_98"},
-    {"name": "mug",         "dir": f"{DATA}/mug/tasting_77"},
-    {"name": "bicycle",     "dir": f"{DATA}/bicycle/2413206"},
-    {"name": "wine_glass",  "dir": f"{DATA}/wine glass/0c72ab77349e218f"},
-    {"name": "wrench",      "dir": f"{DATA}/wrench/wrench"},
-    {"name": "bucket",      "dir": f"{DATA}/bucket/bucket"},
-    {"name": "helmet",      "dir": f"{DATA}/helmet/helmet"},
-    {"name": "pot",         "dir": f"{DATA}/pot/pot"},
-    {"name": "cup",         "dir": f"{DATA}/cup/7d9b247c9f824f5e"},
-    {"name": "chair",       "dir": f"{DATA}/chair/2398495"},
+    # {"name": "coffee_cup", "dir": f"{DATA}/coffee cup/drinking_98"},  # already done
+    {"name": "wrench", "dir": f"{DATA}/wrench/wrench"},
+    {"name": "chair",  "dir": f"{DATA}/chair/2398495"},
 ]
 
 # ── Sweep configs ─────────────────────────────────────────────────────────────
