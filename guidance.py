@@ -12,6 +12,7 @@ BaseGuidance          abstract base — apply() returns dict of corrected x_t ke
   ShapeGuidance       soft-IoU loss          → x_t["shape"]
   PoseGuidance        centroid + size losses → x_t["translation/6drotation_normalized/scale"]
   DepthGuidance       scale-invariant depth  → x_t["shape"]
+  NormalGuidance      Sobel normal loss      → x_t["shape"]
   CompositeGuidance   chains modules; last write wins for shared keys
 
 Usage::
@@ -20,6 +21,7 @@ Usage::
         ShapeGuidance(mask_path, shape_scale=5.0),
         PoseGuidance(mask_path, pose_scale=0.05),
         DepthGuidance(depth_path, depth_scale=5.0),
+        NormalGuidance(depth_path, normal_scale=2.0)
     ])
 
     corrections = guidance.apply(
@@ -661,6 +663,252 @@ class DepthGuidance(BaseGuidance):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# NormalGuidance
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class NormalGuidance(BaseGuidance):
+    """
+    Sobel-normal consistency guidance → corrects x_t['shape'].
+
+    Pipeline:
+        shape_lat
+            → ss_decoder
+            → FlexiCubes
+            → depth render
+            → Sobel normals
+            → cosine normal loss
+
+    Pose is decoded from x_t without grad (held fixed).
+    """
+
+    def __init__(
+        self,
+        depth_path: str,
+        mask_path: str = None,
+        normal_scale: float = 5.0,
+        image_size: int = 256,
+        start_t: float = 0.0,
+        device: str = "cpu",
+    ):
+        self.normal_scale = normal_scale
+        self.image_size = image_size
+        self.start_t = start_t
+        self.device = torch.device(device)
+
+        gt_depth = _load_gt_depth(depth_path, image_size)
+
+        if mask_path is not None:
+            obj_mask = _load_and_clean_mask(
+                mask_path,
+                image_size,
+                min_blob_area=0,
+            )
+            gt_depth = gt_depth * obj_mask
+
+        self.gt_depth = gt_depth
+
+        print(
+            f"[NormalGuidance] depth={depth_path}  "
+            f"mask={'yes' if mask_path else 'no'}  "
+            f"scale={normal_scale}  start_t={start_t}"
+        )
+
+    def _depth_to_normals(self, depth: torch.Tensor):
+        """
+        depth: (H,W)
+
+        returns:
+            normals: (3,H,W)
+        """
+
+        device = depth.device
+
+        sobel_x = torch.tensor(
+            [[-1, 0, 1],
+             [-2, 0, 2],
+             [-1, 0, 1]],
+            dtype=torch.float32,
+            device=device,
+        ).view(1, 1, 3, 3)
+
+        sobel_y = torch.tensor(
+            [[-1, -2, -1],
+             [ 0,  0,  0],
+             [ 1,  2,  1]],
+            dtype=torch.float32,
+            device=device,
+        ).view(1, 1, 3, 3)
+
+        d = depth[None, None]
+
+        dzdx = torch.nn.functional.conv2d(
+            d,
+            sobel_x,
+            padding=1,
+        )[0, 0]
+
+        dzdy = torch.nn.functional.conv2d(
+            d,
+            sobel_y,
+            padding=1,
+        )[0, 0]
+
+        nx = -dzdx
+        ny = -dzdy
+        nz = torch.ones_like(depth)
+
+        normals = torch.stack([nx, ny, nz], dim=0)
+
+        normals = torch.nn.functional.normalize(
+            normals,
+            dim=0,
+        )
+
+        return normals
+
+    def _loss_normal(self, pred_depth, gt_depth):
+        """
+        Surface normal consistency loss.
+        """
+
+        gt = gt_depth.to(pred_depth.device)
+
+        valid = (gt > 0) & (pred_depth > 0)
+
+        if valid.sum() == 0:
+            return torch.tensor(
+                0.0,
+                device=pred_depth.device,
+                requires_grad=True,
+            )
+
+        pred_n = self._depth_to_normals(pred_depth)
+        gt_n = self._depth_to_normals(gt)
+
+        cosine = (pred_n * gt_n).sum(dim=0)
+
+        return (1.0 - cosine[valid]).mean()
+
+    @torch.enable_grad()
+    def apply(
+        self,
+        x_t,
+        ss_decoder,
+        pose_decoder,
+        intrinsics,
+        scene_scale=None,
+        scene_shift=None,
+        t_step: float = 1.0,
+    ) -> dict:
+
+        if t_step <= self.start_t:
+            return {}
+
+        B = x_t["shape"].shape[0]
+
+        shape_lat = (
+            x_t["shape"]
+            .detach()
+            .float()
+            .requires_grad_(True)
+        )
+
+        ss_grid = ss_decoder(
+            shape_lat.permute(0, 2, 1)
+            .contiguous()
+            .view(B, 8, 16, 16, 16)
+        )
+
+        n_occ = int((ss_grid[0, 0] > 0).sum())
+
+        print(
+            f"  [normal] t={t_step:.3f}  "
+            f"occupied={n_occ}/{ss_grid.shape[-1] ** 3}"
+        )
+
+        result = _extract_mesh(ss_grid, self.device)
+
+        if result is None:
+            print(
+                f"  [normal] t={t_step:.3f}  "
+                f"empty mesh — skipping"
+            )
+            return {}
+
+        verts, faces = result
+
+        with torch.no_grad():
+            pose = pose_decoder(
+                x_t,
+                scene_scale=scene_scale,
+                scene_shift=scene_shift,
+            )
+
+        pred_depth = _render_depth(
+            verts,
+            faces,
+            pose["rotation"],
+            pose["translation"],
+            pose["scale"],
+            intrinsics,
+            self.image_size,
+            self.device,
+        )
+
+        valid_px = int(
+            (
+                (self.gt_depth.to(pred_depth.device) > 0)
+                & (pred_depth > 0)
+            ).sum()
+        )
+
+        print(
+            f"  [normal] t={t_step:.3f}  "
+            f"valid_px={valid_px}"
+        )
+
+        loss = self._loss_normal(
+            pred_depth,
+            self.gt_depth,
+        )
+
+        if not torch.isfinite(loss):
+            print(
+                f"  [normal] t={t_step:.3f}  "
+                f"non-finite loss — skipping"
+            )
+            return {}
+
+        (grad,) = torch.autograd.grad(
+            loss,
+            shape_lat,
+            allow_unused=True,
+        )
+
+        if grad is None:
+            print(
+                f"  [normal] t={t_step:.3f}  "
+                f"no overlap — skipping"
+            )
+            return {}
+
+        print(
+            f"  [normal] t={t_step:.3f}  "
+            f"loss={loss.item():.6f}"
+        )
+
+        with torch.no_grad():
+            return {
+                "shape": _apply_correction(
+                    x_t["shape"],
+                    grad,
+                    self.normal_scale,
+                    "normal",
+                )
+            }
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CompositeGuidance
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -677,6 +925,9 @@ class CompositeGuidance(BaseGuidance):
 
         # pose only
         CompositeGuidance([PoseGuidance(...)])
+
+        # normal only
+        CompositeGuidance([NormalGuidance(...)])
 
         # silhouette + pose
         CompositeGuidance([ShapeGuidance(...), PoseGuidance(...)])

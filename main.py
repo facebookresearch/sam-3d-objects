@@ -14,6 +14,7 @@ def build_guidance(
     ss_guidance_scale,
     pose_guidance_scale,
     depth_guidance_scale,
+    normal_guidance_scale,
     depth_map,
     steps_prefix,
     w_centroid,
@@ -23,11 +24,12 @@ def build_guidance(
         (ss_guidance_scale is not None and ss_guidance_scale > 0)
         or (pose_guidance_scale is not None and pose_guidance_scale > 0)
         or (depth_guidance_scale is not None and depth_guidance_scale > 0)
+        or (normal_guidance_scale is not None and normal_guidance_scale > 0)
     )
     if not any_guidance:
         return None
 
-    from guidance import CompositeGuidance, DepthGuidance, PoseGuidance, ShapeGuidance
+    from guidance import CompositeGuidance, DepthGuidance, PoseGuidance, ShapeGuidance, NormalGuidance
 
     debug_root = os.path.join("outputs", steps_prefix or "ss_steps", "guidance_debug")
     modules = []
@@ -73,6 +75,24 @@ def build_guidance(
                 )
             )
 
+    if normal_guidance_scale is not None and normal_guidance_scale > 0:
+        if depth_map is None:
+            print(
+                "[GUIDANCE] WARNING: --normal-guidance-scale set but --depth-map not provided — skipping NormalGuidance"
+            )
+        else:
+            print(
+                f"[GUIDANCE] NormalGuidance  scale={normal_guidance_scale}  depth={depth_map}"
+            )
+            modules.append(
+                NormalGuidance(
+                    depth_path=depth_map,
+                    mask_path=mask_path,
+                    normal_scale=normal_guidance_scale,
+                    device="cpu",
+                )
+            )
+
     return CompositeGuidance(modules) if modules else None
 
 
@@ -100,6 +120,12 @@ def main():
         type=float,
         default=None,
         help="Depth guidance scale. Requires --depth-map.",
+    )
+    parser.add_argument(
+        "--normal-guidance-scale",
+        type=float,
+        default=None,
+        help="Normal guidance scale. Requires --depth-map."
     )
     parser.add_argument(
         "--depth-map",
@@ -130,6 +156,7 @@ def main():
         ss_guidance_scale=args.ss_guidance_scale,
         pose_guidance_scale=args.pose_guidance_scale,
         depth_guidance_scale=args.depth_guidance_scale,
+        normal_guidance_scale=args.normal_guidance_scale,
         depth_map=args.depth_map,
         steps_prefix=args.prefix,
         w_centroid=args.w_centroid,
