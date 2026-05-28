@@ -5,8 +5,7 @@ Public API: ``evaluate_pair(pred_path, gt_path, ...) -> dict`` runs the MVP prot
 F-score @ {0.005, 0.01, 0.02, 0.05}) and returns a flat dict of metrics.
 
 MVP scope (deliberate omissions):
-  - No ICP alignment. Teammates align inputs themselves; ICP lands in Phase 6 after
-    the PyTorch3D rebuild.
+  - No ICP alignment.
   - No voxel-IoU or EMD. Both stay in ``metrics.py`` for the Phase 6 paper-protocol
     runner; the MVP only ships the two metrics we'll actually report on now.
   - Default ``n=10_000``. PyTorch3D's ``knn_points`` is brute-force O(N·M) on CPU,
