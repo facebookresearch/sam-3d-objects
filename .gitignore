@@ -17,3 +17,11 @@ checkpoints/hf-download/
 splat*.ply
 outputs/
 data
+
+# Personal planning docs (not for the team fork)
+sam3d_evaluation_plan.md
+sam3d_progress_log.md
+
+# Evaluation datasets (symlinks to /scratch-shared/$USER/eval/)
+data/eval/
+data/validation/
