@@ -19,7 +19,9 @@ import numpy as np
 import torch
 import trimesh
 
-sys.path.append("notebook")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.append(os.path.join(ROOT, "notebook"))
 from inference import Inference, load_image, load_mask
 from main import build_guidance
 

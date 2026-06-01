@@ -28,7 +28,7 @@ python -c "import torch; print('CUDA:', torch.cuda.is_available(), '/', torch.cu
 
 echo ""
 echo "=== Eval Baseline All ==="
-time python eval_baseline_all.py
+time python scripts/eval_baseline_all.py
 
 echo ""
 echo "=== 11_eval_baseline_all DONE ==="

@@ -18,10 +18,10 @@ from collections import defaultdict
 
 import numpy as np
 
-sys.path.append("notebook")  # for inference imports used transitively
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.append(os.path.join(ROOT, "notebook"))
 from eval_single import align_icp, chamfer, f_score, load_gt_points, normalize, seed_everything
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from eval_baseline_all import axis_aligned_rotations  # 24 axis-aligned rotations
 
 # Must match sweep.py exactly

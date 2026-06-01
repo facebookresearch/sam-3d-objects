@@ -29,7 +29,7 @@ python -c "import torch; print('CUDA:', torch.cuda.is_available(), '/', torch.cu
 
 echo ""
 echo "=== Baseline All — all categories from categories.txt, no cap, skips done ==="
-time python baseline_all.py --cap 9999 --seed 42
+time python scripts/baseline_all.py --cap 9999 --seed 42
 
 echo ""
 echo "=== 10a_baseline_all DONE ==="

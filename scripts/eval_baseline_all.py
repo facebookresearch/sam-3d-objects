@@ -19,7 +19,9 @@ from collections import defaultdict
 import numpy as np
 import torch
 
-sys.path.append("notebook")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.append(os.path.join(ROOT, "notebook"))
 from eval_single import align_icp, chamfer, load_gt_points, normalize, seed_everything
 
 

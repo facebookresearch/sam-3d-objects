@@ -26,8 +26,8 @@ echo "=== Guidance sweep on worst 30 instances ==="
 echo "Configs: ss_1.0  ss_5.0  ss_10.0  ss5_pose005"
 echo ""
 
-time python sweep.py \
-    --instances worst_30.txt \
+time python scripts/sweep.py \
+    --instances misc/worst_30.txt \
     --configs ss_1.0 ss_5.0 ss_10.0 ss5_pose005
 
 echo ""
@@ -37,7 +37,7 @@ for cfg in ss_1.0 ss_5.0 ss_10.0 ss5_pose005; do
     if [ -d "$pred_root" ]; then
         echo ""
         echo "--- $cfg ---"
-        python eval_baseline_all.py \
+        python scripts/eval_baseline_all.py \
             --pred-root "$pred_root" \
             --out "outputs/sweep/${cfg}/results_multi_init.csv" \
             --device cuda

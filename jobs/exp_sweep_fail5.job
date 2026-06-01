@@ -28,7 +28,7 @@ CONFIGS="baseline ss_1.0 ss_2.0 ss_3.0 ss_5.0 depth_2.0 depth_5.0 normal_2.0 nor
 echo "=== Guidance sweep on 5 failure cases ==="
 echo "Configs: $CONFIGS"
 echo ""
-time python sweep.py --instances failure5.txt --configs $CONFIGS
+time python scripts/sweep.py --instances misc/failure5.txt --configs $CONFIGS
 
 echo ""
 echo "=== Per-config CD eval (compare vs baseline in outputs/baseline_all/results_multi_init.csv) ==="
@@ -36,7 +36,7 @@ for cfg in $CONFIGS; do
     if [ -d "outputs/sweep/$cfg" ]; then
         echo ""
         echo "--- $cfg ---"
-        python eval_baseline_all.py \
+        python scripts/eval_baseline_all.py \
             --pred-root "outputs/sweep/$cfg" \
             --out "outputs/sweep/$cfg/results_fail5.csv" \
             --device cuda
