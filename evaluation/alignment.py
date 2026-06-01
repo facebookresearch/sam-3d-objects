@@ -79,6 +79,7 @@ def align_icp(
     fixed_rotation: torch.Tensor | None = None,
     estimate_scale: bool = False,
     max_iterations: int = 100,
+    early_exit: bool = True,
 ) -> torch.Tensor:
     """Align ``points_pred`` to ``points_gt`` and return the transformed prediction.
 
@@ -93,6 +94,9 @@ def align_icp(
 
     ``mode="grid"`` runs ICP from each of the 24 cube rotations and returns the
     aligned cloud with the lowest post-ICP chamfer — robust but 24× more compute.
+    When ``early_exit=True`` (default), the search stops as soon as a rotation
+    achieves chamfer < 0.1 on the [-1, 1]-normalised scale, since further search
+    is unlikely to improve on an already-good alignment.
 
     Both inputs are ``(N, 3)`` float tensors on the same device; returns ``(N, 3)``.
     """
@@ -119,6 +123,8 @@ def align_icp(
             if cd < best_cd:
                 best_cd = cd
                 best_pts = aligned
+            if early_exit and best_cd < 0.1:
+                break
         assert best_pts is not None  # cube_rotations() is non-empty
         return best_pts
 

@@ -11,31 +11,17 @@ Usage:
 
 import argparse
 import csv
-import itertools
 import os
 import sys
 from collections import defaultdict
 
 import numpy as np
-import torch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.append(os.path.join(ROOT, "notebook"))
-from eval_single import align_icp, chamfer, load_gt_points, normalize, seed_everything
-
-
-def axis_aligned_rotations(device):
-    """All 24 proper axis-aligned rotation matrices (cube symmetry group)."""
-    mats = []
-    for perm in itertools.permutations([0, 1, 2]):
-        for signs in itertools.product([1, -1], repeat=3):
-            R = np.zeros((3, 3), dtype=np.float32)
-            for row, (col, s) in enumerate(zip(perm, signs)):
-                R[row, col] = float(s)
-            if np.linalg.det(R) > 0.5:
-                mats.append(torch.tensor(R, device=device))
-    return mats
+from eval_single import chamfer, load_gt_points, normalize, seed_everything
+from evaluation.alignment import align_icp
 
 DATA_ROOT = "data/Open3DHOI/data"
 PRED_ROOT = "outputs/baseline_all"
@@ -71,8 +57,6 @@ def main():
     pairs = list(find_pairs(pred_root))
     print(f"Found {len(pairs)} prediction/GT pairs.\n")
 
-    rotations = axis_aligned_rotations(args.device)
-
     rows = []
     for i, (cat, inst, pred_path, gt_path) in enumerate(pairs):
         print(f"[{i+1}/{len(pairs)}] {cat}/{inst} ...", end=" ", flush=True)
@@ -82,17 +66,8 @@ def main():
 
             pred = normalize(pred)
             gt   = normalize(gt)
-            # try all 24 axis-aligned rotations, keep best ICP result
-            best_cd = float("inf")
-            for R in rotations:
-                pred_rot = (R @ pred.T).T
-                pred_icp = align_icp(pred_rot, gt)
-                cd_val   = float(chamfer(pred_icp, gt))
-                if cd_val < best_cd:
-                    best_cd = cd_val
-                if best_cd < 0.1:
-                    break
-            cd = best_cd
+            pred_icp = align_icp(pred, gt, mode="grid")
+            cd = float(chamfer(pred_icp, gt))
             print(f"CD={cd:.4f}")
             row = {"category": cat, "instance": inst, "chamfer": cd}
             rows.append(row)

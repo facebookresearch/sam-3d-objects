@@ -21,8 +21,8 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.append(os.path.join(ROOT, "notebook"))
-from eval_single import align_icp, chamfer, f_score, load_gt_points, normalize, seed_everything
-from eval_baseline_all import axis_aligned_rotations  # 24 axis-aligned rotations
+from eval_single import chamfer, f_score, load_gt_points, normalize, seed_everything
+from evaluation.alignment import align_icp
 
 # Must match sweep.py exactly
 DATA = "data/Open3DHOI/data"
@@ -56,21 +56,14 @@ def config_sort_key(name):
     return (FAMILY_ORDER.get(fam, 9), scale)
 
 
-def eval_one(pred_dir, gt_obj_path, device, rotations):
-    """Multi-init (24-rotation) ICP — matches eval_baseline_all.py protocol.
-    Keeps the rotation with lowest CD; F-score reported for that same alignment."""
+def eval_one(pred_dir, gt_obj_path, device):
+    """24-rotation grid ICP — matches eval_baseline_all.py protocol via evaluation.alignment."""
     pred = normalize(load_gt_points(os.path.join(pred_dir, "pred_mesh.obj"), device=device))
     gt   = normalize(load_gt_points(gt_obj_path, device=device))
-    best_cd, best_aligned = float("inf"), None
-    for R in rotations:
-        pred_icp = align_icp((R @ pred.T).T, gt)
-        cd_val   = float(chamfer(pred_icp, gt))
-        if cd_val < best_cd:
-            best_cd, best_aligned = cd_val, pred_icp
-        if best_cd < 0.1:
-            break
-    fs = f_score(best_aligned, gt, thresholds=FSCORE_THRESHOLDS)
-    return best_cd, fs
+    pred_icp = align_icp(pred, gt, mode="grid")
+    cd = float(chamfer(pred_icp, gt))
+    fs = f_score(pred_icp, gt, thresholds=FSCORE_THRESHOLDS)
+    return cd, fs
 
 
 def main():
@@ -84,8 +77,6 @@ def main():
     sweep_dir = args.sweep_dir
     device    = args.device
     seed_everything()
-    rotations = axis_aligned_rotations(device)
-
     # Discover configs from directory
     configs = sorted([
         d for d in os.listdir(sweep_dir)
@@ -115,7 +106,7 @@ def main():
                 continue
 
             print(f"  {cfg_name} / {sample['name']} ...", end=" ", flush=True)
-            cd, fs = eval_one(pred_dir, gt_path, device, rotations)
+            cd, fs = eval_one(pred_dir, gt_path, device)
             print(f"CD={cd:.4f}  F@0.02={fs[0.02]:.4f}")
 
             row = {"config": cfg_name, "sample": sample["name"], "chamfer": cd}
