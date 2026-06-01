@@ -511,6 +511,7 @@ class InferencePipelinePointMap(InferencePipeline):
                 **outputs,
                 "pointmap": pts.cpu().permute((1, 2, 0)),  # HxWx3
                 "pointmap_colors": pts_colors.cpu().permute((1, 2, 0)),  # HxWx3
+                "intrinsics": pointmap_dict["intrinsics"],
             }
 
     @staticmethod

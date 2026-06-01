@@ -117,7 +117,7 @@ def _phong_renderer(cameras, device):
     return MeshRenderer(
         rasterizer=MeshRasterizer(cameras=cameras,
             raster_settings=RasterizationSettings(
-                image_size=IMAGE_SIZE, blur_radius=0.0, faces_per_pixel=1)),
+                image_size=IMAGE_SIZE, blur_radius=0.0, faces_per_pixel=1, bin_size=0)),
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights,
                                blend_params=BlendParams()),
     )
@@ -162,6 +162,7 @@ def render_pred_silhouette(pred_verts_raw, pred_faces, pose_params, device):
                 image_size=IMAGE_SIZE,
                 blur_radius=np.log(1.0 / 1e-4 - 1.0) * blend.sigma,
                 faces_per_pixel=50,
+                bin_size=0,
             )),
         shader=SoftSilhouetteShader(blend_params=blend),
     )
@@ -175,10 +176,12 @@ def render_pred_silhouette(pred_verts_raw, pred_faces, pose_params, device):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv",    default=os.path.join(PRED_ROOT, "results.csv"))
-    parser.add_argument("--n",      type=int, default=20)
-    parser.add_argument("--single", nargs=2, metavar=("CAT", "INST"))
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--csv",       default=os.path.join(PRED_ROOT, "results_multi_init.csv"))
+    parser.add_argument("--n",         type=int, default=20)
+    parser.add_argument("--single",    nargs=2, metavar=("CAT", "INST"))
+    parser.add_argument("--instances", default=None,
+                        help="text file with cat/instance per line (same format as rerun_worst12.txt)")
+    parser.add_argument("--device",    default="cpu")
     args = parser.parse_args()
 
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -187,6 +190,23 @@ def main():
     if args.single:
         cat, inst = args.single
         rows = [{"category": cat, "instance": inst, "chamfer": 0.0}]
+    elif args.instances:
+        rows = []
+        csv_cds = {}
+        if os.path.exists(args.csv):
+            with open(args.csv) as f:
+                for r in csv.DictReader(f):
+                    csv_cds[(r["category"], r["instance"])] = float(r["chamfer"])
+        with open(args.instances) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("/", 1)
+                if len(parts) == 2:
+                    cat, inst = parts
+                    rows.append({"category": cat, "instance": inst,
+                                 "chamfer": csv_cds.get((cat, inst), 0.0)})
     else:
         with open(args.csv) as f:
             rows = list(csv.DictReader(f))

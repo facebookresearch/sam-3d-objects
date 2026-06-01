@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import csv
+import itertools
 import os
 import sys
 from collections import defaultdict
@@ -20,6 +21,19 @@ import torch
 
 sys.path.append("notebook")
 from eval_single import align_icp, chamfer, load_gt_points, normalize, seed_everything
+
+
+def axis_aligned_rotations(device):
+    """All 24 proper axis-aligned rotation matrices (cube symmetry group)."""
+    mats = []
+    for perm in itertools.permutations([0, 1, 2]):
+        for signs in itertools.product([1, -1], repeat=3):
+            R = np.zeros((3, 3), dtype=np.float32)
+            for row, (col, s) in enumerate(zip(perm, signs)):
+                R[row, col] = float(s)
+            if np.linalg.det(R) > 0.5:
+                mats.append(torch.tensor(R, device=device))
+    return mats
 
 DATA_ROOT = "data/Open3DHOI/data"
 PRED_ROOT = "outputs/baseline_all"
@@ -40,14 +54,22 @@ def find_pairs(pred_root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device",   default="cuda")
-    parser.add_argument("--out",      default=os.path.join(PRED_ROOT, "results.csv"))
+    parser.add_argument("--device",    default="cuda")
+    parser.add_argument("--pred-root", default=PRED_ROOT,
+                        help="root dir containing <cat>/<inst>/pred_mesh.obj")
+    parser.add_argument("--out",       default=None,
+                        help="output CSV path (default: <pred-root>/results_multi_init.csv)")
     args = parser.parse_args()
+
+    pred_root = args.pred_root
+    out_csv   = args.out or os.path.join(pred_root, "results_multi_init.csv")
 
     seed_everything()
 
-    pairs = list(find_pairs(PRED_ROOT))
+    pairs = list(find_pairs(pred_root))
     print(f"Found {len(pairs)} prediction/GT pairs.\n")
+
+    rotations = axis_aligned_rotations(args.device)
 
     rows = []
     for i, (cat, inst, pred_path, gt_path) in enumerate(pairs):
@@ -55,13 +77,20 @@ def main():
         try:
             pred = load_gt_points(pred_path, device=args.device)
             gt   = load_gt_points(gt_path,   device=args.device)
-            # align coord systems: pred Z+ (up) → GT Y- (up)
-            # 90° rotation around X: (x, y, z) → (x, -z, y)
-            pred = torch.stack([pred[:,0], -pred[:,2], pred[:,1]], dim=1)
+
             pred = normalize(pred)
             gt   = normalize(gt)
-            pred = align_icp(pred, gt)
-            cd   = chamfer(pred, gt)
+            # try all 24 axis-aligned rotations, keep best ICP result
+            best_cd = float("inf")
+            for R in rotations:
+                pred_rot = (R @ pred.T).T
+                pred_icp = align_icp(pred_rot, gt)
+                cd_val   = float(chamfer(pred_icp, gt))
+                if cd_val < best_cd:
+                    best_cd = cd_val
+                if best_cd < 0.1:
+                    break
+            cd = best_cd
             print(f"CD={cd:.4f}")
             row = {"category": cat, "instance": inst, "chamfer": cd}
             rows.append(row)
@@ -73,11 +102,11 @@ def main():
 
     # Save CSV
     fieldnames = ["category", "instance", "chamfer"]
-    with open(args.out, "w", newline="") as f:
+    with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"\nSaved {len(rows)} results to {args.out}")
+    print(f"\nSaved {len(rows)} results to {out_csv}")
 
     # Top 30 worst
     print(f"\n{'='*70}")

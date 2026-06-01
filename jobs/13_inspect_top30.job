@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=00:30:00
+#SBATCH --time=02:00:00
 #SBATCH --output=logs/sam_inspect_top30_%j.out
 
 set -eo pipefail
@@ -23,7 +23,7 @@ cd "$HOME/sam-3d-objects"
 mkdir -p logs
 
 echo "=== Collect top 30 worst + bottom 10 best ==="
-python scripts/collect_top30_worst.py --worst 10 --best 10
+python scripts/collect_top30_worst.py --worst 30 --best 10 --csv outputs/baseline_all/results_multi_init.csv
 
 echo ""
 echo "=== Export normalized + ICP aligned meshes ==="

@@ -1,0 +1,48 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=sam_sweep_worst30
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+#SBATCH --time=06:00:00
+#SBATCH --output=logs/sam_sweep_worst30_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+module load CUDA/12.1.1 2>/dev/null || true
+
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate sam3d-objects
+
+cd "$HOME/sam-3d-objects"
+
+mkdir -p logs
+
+echo "=== Guidance sweep on worst 30 instances ==="
+echo "Configs: ss_1.0  ss_5.0  ss_10.0  ss5_pose005"
+echo ""
+
+time python sweep.py \
+    --instances worst_30.txt \
+    --configs ss_1.0 ss_5.0 ss_10.0 ss5_pose005
+
+echo ""
+echo "=== Evaluating each config ==="
+for cfg in ss_1.0 ss_5.0 ss_10.0 ss5_pose005; do
+    pred_root="outputs/sweep/${cfg}"
+    if [ -d "$pred_root" ]; then
+        echo ""
+        echo "--- $cfg ---"
+        python eval_baseline_all.py \
+            --pred-root "$pred_root" \
+            --out "outputs/sweep/${cfg}/results_multi_init.csv" \
+            --device cuda
+    fi
+done
+
+echo ""
+echo "=== 18_sweep_worst30 DONE ==="

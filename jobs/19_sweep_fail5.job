@@ -1,0 +1,47 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=sam_sweep_fail5
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+#SBATCH --time=03:00:00
+#SBATCH --output=logs/sam_sweep_fail5_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+module load CUDA/12.1.1 2>/dev/null || true
+
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate sam3d-objects
+
+cd "$HOME/sam-3d-objects"
+
+mkdir -p logs
+
+# cheap+main first, pose last (most expensive → timeout-safe; sweep.py resumes on rerun)
+CONFIGS="baseline ss_1.0 ss_2.0 ss_3.0 ss_5.0 depth_2.0 depth_5.0 normal_2.0 normal_5.0 pose_0.05 pose_0.2"
+
+echo "=== Guidance sweep on 5 failure cases ==="
+echo "Configs: $CONFIGS"
+echo ""
+time python sweep.py --instances failure5.txt --configs $CONFIGS
+
+echo ""
+echo "=== Per-config CD eval (compare vs baseline in outputs/baseline_all/results_multi_init.csv) ==="
+for cfg in $CONFIGS; do
+    if [ -d "outputs/sweep/$cfg" ]; then
+        echo ""
+        echo "--- $cfg ---"
+        python eval_baseline_all.py \
+            --pred-root "outputs/sweep/$cfg" \
+            --out "outputs/sweep/$cfg/results_fail5.csv" \
+            --device cuda
+    fi
+done
+
+echo ""
+echo "=== 19_sweep_fail5 DONE ==="

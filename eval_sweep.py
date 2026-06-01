@@ -14,11 +14,15 @@ import argparse
 import csv
 import os
 import sys
+from collections import defaultdict
 
 import numpy as np
 
 sys.path.append("notebook")  # for inference imports used transitively
 from eval_single import align_icp, chamfer, f_score, load_gt_points, normalize, seed_everything
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from eval_baseline_all import axis_aligned_rotations  # 24 axis-aligned rotations
 
 # Must match sweep.py exactly
 DATA = "data/Open3DHOI/data"
@@ -31,16 +35,42 @@ SAMPLES = [
 
 FSCORE_THRESHOLDS = (0.005, 0.01, 0.02, 0.05)
 
+FAMILY_ORDER = {"ss": 1, "pose": 2, "depth": 3, "normal": 4}
 
-def eval_one(pred_dir, gt_obj_path, device):
-    pred = load_gt_points(os.path.join(pred_dir, "pred_mesh.obj"), device=device)
-    gt   = load_gt_points(gt_obj_path, device=device)
-    pred = normalize(pred)
-    gt   = normalize(gt)
-    pred = align_icp(pred, gt)
-    cd   = chamfer(pred, gt)
-    fs   = f_score(pred, gt, thresholds=FSCORE_THRESHOLDS)
-    return cd, fs
+
+def parse_config(name):
+    """'ss_5.0' -> ('ss', 5.0); 'baseline' -> ('baseline', 0.0)."""
+    if name == "baseline":
+        return ("baseline", 0.0)
+    fam, _, scale = name.partition("_")
+    try:
+        return (fam, float(scale))
+    except ValueError:
+        return (fam, 0.0)
+
+
+def config_sort_key(name):
+    fam, scale = parse_config(name)
+    if fam == "baseline":
+        return (0, 0.0)
+    return (FAMILY_ORDER.get(fam, 9), scale)
+
+
+def eval_one(pred_dir, gt_obj_path, device, rotations):
+    """Multi-init (24-rotation) ICP — matches eval_baseline_all.py protocol.
+    Keeps the rotation with lowest CD; F-score reported for that same alignment."""
+    pred = normalize(load_gt_points(os.path.join(pred_dir, "pred_mesh.obj"), device=device))
+    gt   = normalize(load_gt_points(gt_obj_path, device=device))
+    best_cd, best_aligned = float("inf"), None
+    for R in rotations:
+        pred_icp = align_icp((R @ pred.T).T, gt)
+        cd_val   = float(chamfer(pred_icp, gt))
+        if cd_val < best_cd:
+            best_cd, best_aligned = cd_val, pred_icp
+        if best_cd < 0.1:
+            break
+    fs = f_score(best_aligned, gt, thresholds=FSCORE_THRESHOLDS)
+    return best_cd, fs
 
 
 def main():
@@ -54,6 +84,7 @@ def main():
     sweep_dir = args.sweep_dir
     device    = args.device
     seed_everything()
+    rotations = axis_aligned_rotations(device)
 
     # Discover configs from directory
     configs = sorted([
@@ -84,7 +115,7 @@ def main():
                 continue
 
             print(f"  {cfg_name} / {sample['name']} ...", end=" ", flush=True)
-            cd, fs = eval_one(pred_dir, gt_path, device)
+            cd, fs = eval_one(pred_dir, gt_path, device, rotations)
             print(f"CD={cd:.4f}  F@0.02={fs[0.02]:.4f}")
 
             row = {"config": cfg_name, "sample": sample["name"], "chamfer": cd}
@@ -107,19 +138,71 @@ def main():
         writer.writerows(rows)
     print(f"Saved per-sample results to {csv_path}")
 
-    # Summary table
-    print(f"\n{'config':<20} {'CD↓':>8} {'F@0.01↑':>9} {'F@0.02↑':>9} {'F@0.05↑':>9}  samples")
-    print("-" * 70)
+    # mean CD per config
+    mean_cd = {}
     for cfg_name in configs:
         cfg_rows = [r for r in rows if r["config"] == cfg_name]
-        if not cfg_rows:
-            continue
-        mean_cd  = np.mean([r["chamfer"] for r in cfg_rows])
-        mean_f01 = np.mean([r["f@0.01"]  for r in cfg_rows])
-        mean_f02 = np.mean([r["f@0.02"]  for r in cfg_rows])
-        mean_f05 = np.mean([r["f@0.05"]  for r in cfg_rows])
-        n        = len(cfg_rows)
-        print(f"{cfg_name:<20} {mean_cd:>8.4f} {mean_f01:>9.4f} {mean_f02:>9.4f} {mean_f05:>9.4f}  {n}")
+        if cfg_rows:
+            mean_cd[cfg_name] = np.mean([r["chamfer"] for r in cfg_rows])
+
+    base_cd = mean_cd.get("baseline")
+
+    # Summary table (sorted by family then numeric scale)
+    print(f"\n{'config':<20} {'CD↓':>8} {'F@0.01↑':>9} {'F@0.02↑':>9} {'F@0.05↑':>9}  samples")
+    print("-" * 70)
+    for cfg_name in sorted(mean_cd, key=config_sort_key):
+        cfg_rows = [r for r in rows if r["config"] == cfg_name]
+        m_cd  = np.mean([r["chamfer"] for r in cfg_rows])
+        m_f01 = np.mean([r["f@0.01"]  for r in cfg_rows])
+        m_f02 = np.mean([r["f@0.02"]  for r in cfg_rows])
+        m_f05 = np.mean([r["f@0.05"]  for r in cfg_rows])
+        print(f"{cfg_name:<20} {m_cd:>8.4f} {m_f01:>9.4f} {m_f02:>9.4f} {m_f05:>9.4f}  {len(cfg_rows)}")
+
+    # ── RANGE ANALYSIS ──────────────────────────────────────────────────────
+    # For each guidance family: CD vs scale, Δ vs baseline, sweet spot.
+    print(f"\n\n{'='*64}")
+    print("RANGE ANALYSIS  (Δ = mean CD − baseline; negative = improvement)")
+    if base_cd is not None:
+        print(f"baseline mean CD = {base_cd:.4f}")
+    print("=" * 64)
+
+    fam_entries = defaultdict(list)  # family -> [(scale, cfg, mean_cd)]
+    for cfg_name, m in mean_cd.items():
+        fam, scale = parse_config(cfg_name)
+        if fam in FAMILY_ORDER:
+            fam_entries[fam].append((scale, cfg_name, m))
+
+    for fam in sorted(fam_entries, key=lambda f: FAMILY_ORDER[f]):
+        entries = sorted(fam_entries[fam])  # by scale
+        print(f"\n[{fam}]   scale      CD      Δ vs base   trend")
+        print(f"  {'-'*46}")
+        prev = base_cd
+        for scale, cfg_name, m in entries:
+            if base_cd is not None:
+                delta = m - base_cd
+                dstr = f"{'+' if delta >= 0 else ''}{delta:.4f}"
+                mark = "improve" if delta < -1e-4 else ("worse" if delta > 1e-4 else "~same")
+            else:
+                dstr, mark = "n/a", ""
+            arrow = ""
+            if prev is not None:
+                arrow = "down" if m < prev - 1e-4 else ("up" if m > prev + 1e-4 else "flat")
+            print(f"  {scale:>8.3f}  {m:>8.4f}   {dstr:>9}   {mark:<7} {arrow}")
+            prev = m
+
+        best_scale, best_cfg, best_m = min(entries, key=lambda e: e[2])
+        if base_cd is not None:
+            verdict = (f"BEST {best_cfg} (CD={best_m:.4f}, Δ={best_m - base_cd:+.4f})"
+                       if best_m < base_cd - 1e-4
+                       else f"no config beats baseline (best {best_cfg} CD={best_m:.4f})")
+        else:
+            verdict = f"BEST {best_cfg} (CD={best_m:.4f})"
+        print(f"  -> {verdict}")
+
+    print(f"\n{'='*64}")
+    print("Read the 'trend' column: CD should drop then rise — pick the scale")
+    print("at the minimum. If still dropping at the max scale, range is too low.")
+    print("=" * 64)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,12 @@
+cup/HICO_train2015_00001318
+sports ball/2c6546464db81c8f
+suitcase/HICO_train2015_00000809
+skis/COCO_train2014_000000002758
+banana/HICO_train2015_00010614
+cake/2321801
+chair/2339751
+bench/2402226
+hot dog/COCO_train2014_000000347482
+handbag/COCO_train2014_000000176091_1
+apple/COCO_train2014_000000578231
+suitcase/HICO_train2015_00007565

@@ -73,24 +73,44 @@ def discover_instances(categories, cap):
     return instances
 
 
-def run(tag, seed, cap, offset, limit):
+def load_instances_file(path):
+    """Load explicit cat/instance pairs from a text file (one per line)."""
+    instances = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("/", 1)
+            if len(parts) == 2:
+                cat, inst = parts
+                inst_dir = os.path.join(DATA_ROOT, cat, inst)
+                instances.append((cat, inst, inst_dir))
+    return instances
+
+
+def run(tag, seed, cap, offset, limit, instances_file=None):
     config_path = f"checkpoints/{tag}/pipeline.yaml"
     print(f"Loading model from {config_path} ...")
     inference = Inference(config_path, compile=False)
     print("Model loaded.\n")
 
-    categories = load_categories()
-    all_instances = discover_instances(categories, cap)
-    print(f"Categories: {len(categories)}  Total instances (cap={cap}): {len(all_instances)}")
-
-    subset = all_instances[offset : offset + limit if limit else None]
-    end = offset + len(subset)
-    print(f"This job: [{offset+1}:{end}] = {len(subset)} instances.\n")
+    if instances_file:
+        subset = load_instances_file(instances_file)
+        print(f"Explicit instances from {instances_file}: {len(subset)}\n")
+        end = len(subset)
+    else:
+        categories = load_categories()
+        all_instances = discover_instances(categories, cap)
+        print(f"Categories: {len(categories)}  Total instances (cap={cap}): {len(all_instances)}")
+        subset = all_instances[offset : offset + limit if limit else None]
+        end = offset + len(subset)
+        print(f"This job: [{offset+1}:{end}] = {len(subset)} instances.\n")
 
     done = skipped = failed = 0
 
     for i, (cat, inst, inst_dir) in enumerate(subset):
-        global_idx = offset + i + 1
+        global_idx = i + 1 if instances_file else offset + i + 1
         out_dir = os.path.join(OUT_ROOT, cat, inst)
         pred_mesh_path  = os.path.join(out_dir, "pred_mesh.obj")
         pose_params_path = os.path.join(out_dir, "pose_params.pt")
@@ -111,6 +131,7 @@ def run(tag, seed, cap, offset, limit):
                 ss_guidance_scale=None,
                 pose_guidance_scale=None,
                 depth_guidance_scale=None,
+                normal_guidance_scale=None,
                 depth_map=None,
                 steps_prefix=None,
                 w_centroid=1.0,
@@ -162,9 +183,11 @@ def main():
     parser.add_argument("--seed",   type=int, default=42)
     parser.add_argument("--cap",    type=int, default=50)
     parser.add_argument("--offset", type=int, default=0)
-    parser.add_argument("--limit",  type=int, default=None)
+    parser.add_argument("--limit",     type=int, default=None)
+    parser.add_argument("--instances", default=None,
+                        help="text file with cat/instance per line to run explicitly")
     args = parser.parse_args()
-    run(args.tag, args.seed, args.cap, args.offset, args.limit)
+    run(args.tag, args.seed, args.cap, args.offset, args.limit, args.instances)
 
 
 if __name__ == "__main__":

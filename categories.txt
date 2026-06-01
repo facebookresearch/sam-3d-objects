@@ -1,0 +1,105 @@
+# Pick categories to include in baseline_all run.
+# Format: one category per line (lines starting with # are ignored).
+# Instance count shown after the | for reference.
+
+# air cushion  |  1 instances
+# apple  |  2 instances
+# ashcan  |  1 instances
+# award  |  1 instances
+# backpack  |  7 instances
+# baggage  |  1 instances
+# banana  |  31 instances
+# barrel  |  1 instances
+# baseball glove  |  5 instances
+# basket  |  1 instances
+# bed  |  36 instances
+# bench  |  300 instances
+# book  |  8 instances
+# boot  |  1 instances
+# bottle  |  104 instances
+# bouquet  |  1 instances
+# bowl  |  11 instances
+# box  |  1 instances
+# bucket  |  1 instances
+# bullet  |  1 instances
+# cake  |  59 instances
+# carrot  |  8 instances
+# cell phone  |  18 instances
+# chain  |  1 instances
+# chair  |  285 instances
+# clock  |  9 instances
+# coffee cup  |  1 instances
+# cookie  |  1 instances
+# couch  |  72 instances
+# cup  |  41 instances
+# dining table  |  16 instances
+# donut  |  33 instances
+# eggs  |  1 instances
+# fire extinguisher  |  1 instances
+# fire hydrant  |  6 instances
+# float  |  2 instances
+# fork  |  11 instances
+# frisbee  |  38 instances
+# furniture  |  1 instances
+# guitar  |  1 instances
+# hair drier  |  5 instances
+# hairbrush  |  1 instances
+# hammer  |  1 instances
+# hammock  |  1 instances
+# hand glass  |  1 instances
+# handbag  |  54 instances
+# helmet  |  1 instances
+# hobby  |  2 instances
+# hoe  |  1 instances
+# home plate  |  1 instances
+# hot dog  |  7 instances
+# ice cream  |  1 instances
+# keyboard  |  7 instances
+# knife  |  15 instances
+# laptop  |  85 instances
+# light bulb  |  1 instances
+# liquor  |  1 instances
+# loaf of bread  |  1 instances
+# mortar  |  1 instances
+# mouse  |  2 instances
+# mug  |  1 instances
+# oven  |  1 instances
+# package  |  1 instances
+# pen  |  1 instances
+# piano  |  1 instances
+# pipage  |  1 instances
+# pistol  |  1 instances
+# pitcher  |  1 instances
+# pizza  |  40 instances
+# pot  |  1 instances
+# pottery  |  1 instances
+# power drill  |  1 instances
+# pump  |  1 instances
+# pumpkin  |  1 instances
+# remote  |  9 instances
+# rose  |  1 instances
+# sandwich  |  18 instances
+# scissors  |  10 instances
+# sculpture  |  1 instances
+# shovel  |  1 instances
+# skis  |  6 instances
+# sniper rifle  |  1 instances
+# spoon  |  20 instances
+# sports ball  |  47 instances
+# stone  |  1 instances
+# suitcase  |  20 instances
+# tarpaulin  |  1 instances
+# teddy bear  |  11 instances
+# television  |  1 instances
+# tennis racket  |  87 instances
+# tie  |  5 instances
+# toilet  |  8 instances
+# toothbrush  |  13 instances
+# torch  |  1 instances
+# umbrella  |  33 instances
+# vacuum cleaner  |  1 instances
+# vase  |  1 instances
+# violin  |  1 instances
+# whip  |  1 instances
+# wine glass  |  80 instances
+# wrench  |  1 instances

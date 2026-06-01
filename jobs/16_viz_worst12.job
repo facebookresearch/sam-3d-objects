@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=sam_eval_sweep
+#SBATCH --job-name=sam_viz_worst12
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=01:00:00
-#SBATCH --output=logs/sam_eval_sweep_%j.out
+#SBATCH --time=00:30:00
+#SBATCH --output=logs/sam_viz_worst12_%j.out
 
 set -eo pipefail
 
@@ -22,8 +22,10 @@ cd "$HOME/sam-3d-objects"
 
 mkdir -p logs
 
-echo "=== Eval sweep (24-rotation multi-init ICP + range analysis) ==="
-python eval_sweep.py --device cuda
+echo "=== Visualize 12 worst instances ==="
+time python scripts/viz_gt_vs_pred.py \
+    --instances rerun_worst12.txt \
+    --device cuda
 
 echo ""
-echo "=== 08_eval_sweep DONE ==="
+echo "=== 16_viz_worst12 DONE ==="

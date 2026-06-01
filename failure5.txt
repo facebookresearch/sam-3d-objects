@@ -1,0 +1,6 @@
+# 5 qualitative failure cases (showcase) — all in worst_30
+suitcase/HICO_train2015_00000809
+skis/COCO_train2014_000000002758
+banana/HICO_train2015_00010614
+chair/2339751
+suitcase/HICO_train2015_00007565
