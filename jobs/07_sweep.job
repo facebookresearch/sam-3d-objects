@@ -29,7 +29,7 @@ python -c "import torch; print('CUDA:', torch.cuda.is_available(), '/', torch.cu
 
 echo ""
 echo "=== Sweep ==="
-time python sweep.py --seed 42
+time python scripts/sweep.py --seed 42
 
 echo ""
 echo "=== 07_sweep DONE ==="

@@ -23,7 +23,7 @@ cd "$HOME/sam-3d-objects"
 mkdir -p logs
 
 echo "=== Eval sweep (24-rotation multi-init ICP + range analysis) ==="
-python eval_sweep.py --device cuda
+python scripts/eval_sweep.py --device cuda
 
 echo ""
 echo "=== 08_eval_sweep DONE ==="
