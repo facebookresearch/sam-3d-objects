@@ -1,0 +1,23 @@
+# FastAPI and server dependencies
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+httpx==0.28.1
+
+# Core ML dependencies - PyTorch with CUDA 12.6 support
+--extra-index-url https://download.pytorch.org/whl/cu126
+torch==2.7.0+cu126
+torchvision==0.20.0+cu126
+
+# Hugging Face for model downloads
+huggingface-hub[cli]>=0.26.0,<1.0
+
+# Image processing
+pillow>=10.0.0
+numpy>=1.24.0
+
+# Existing SAM 3D dependencies (from parent requirements.txt)
+omegaconf>=2.3.0
+hydra-core>=1.3.2
+einops>=0.7.0
+opencv-python>=4.9.0
