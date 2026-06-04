@@ -48,7 +48,7 @@ opencv-python==4.9.0.80
 OpenEXR==3.3.3
 optimum==1.18.1
 optree==0.14.1
-orjson==3.10.0
+orjson==3.11.6
 panda3d-gltf==1.2.1
 pdoc3==0.10.0
 peft==0.10.0
