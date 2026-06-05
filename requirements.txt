@@ -67,7 +67,7 @@ randomname==0.2.1
 roma==1.5.1
 rootutils==1.0.7
 Rtree==1.3.0
-sagemaker==2.242.0
+sagemaker==3.4.0
 scikit-image==0.23.1
 sentence-transformers==2.6.1
 simplejson==3.19.2
