@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  sam3d:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        USERNAME: ${LOCAL_USER:-developer}
+        USER_UID: ${LOCAL_UID:-1000}
+        USER_GID: ${LOCAL_GID:-1000}
+        EXTRA_APT_PACKAGES: ${EXTRA_APT_PACKAGES:-}
+        TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST:-sm_80}
+    image: sam3d-dev
+    working_dir: /workspace
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - .:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+    shm_size: 16g
+    tty: true
+    stdin_open: true
