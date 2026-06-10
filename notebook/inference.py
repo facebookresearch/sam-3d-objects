@@ -2,7 +2,7 @@
 import os
 
 # not ideal to put that here
-os.environ["CUDA_HOME"] = os.environ["CONDA_PREFIX"]
+os.environ["CUDA_HOME"] = os.environ.get("CONDA_PREFIX", "/usr/local/cuda")
 os.environ["LIDRA_SKIP_INIT"] = "true"
 
 import sys
