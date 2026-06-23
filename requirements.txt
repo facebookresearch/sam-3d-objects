@@ -45,7 +45,7 @@ nvidia-pyindex==1.0.9
 objsize==0.7.0
 open3d==0.18.0
 opencv-python==4.9.0.80
-OpenEXR==3.3.3
+OpenEXR==3.3.8
 optimum==1.18.1
 optree==0.14.1
 orjson==3.10.0
