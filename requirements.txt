@@ -41,7 +41,7 @@ lightning==2.3.3
 loguru==0.7.2
 mosaicml-streaming==0.7.5
 nvidia-cuda-nvcc-cu12==12.1.105
-nvidia-pyindex==1.0.9
+#nvidia-pyindex==1.0.9
 objsize==0.7.0
 open3d==0.18.0
 opencv-python==4.9.0.80

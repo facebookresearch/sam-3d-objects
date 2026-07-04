@@ -367,7 +367,6 @@ class InferencePipelinePointMap(InferencePipeline):
 
             logger.info(f"Rescaling scale by {ss_return_dict['downsample_factor']} after downsampling")
             ss_return_dict["scale"] = ss_return_dict["scale"] * ss_return_dict["downsample_factor"]
-
             if stage1_only:
                 logger.info("Finished!")
                 ss_return_dict["voxel"] = ss_return_dict["coords"][:, 1:] / 64 - 0.5
@@ -376,6 +375,7 @@ class InferencePipelinePointMap(InferencePipeline):
                     "pointmap": pts.cpu().permute((1, 2, 0)),  # HxWx3
                     "pointmap_colors": pts_colors.cpu().permute((1, 2, 0)),  # HxWx3
                 }
+
                 # return ss_return_dict
 
             coords = ss_return_dict["coords"]

@@ -512,7 +512,7 @@ class InferencePipeline:
                 logger.info("Finished!")
                 ss_return_dict["voxel"] = ss_return_dict["coords"][:, 1:] / 64 - 0.5
                 return ss_return_dict
-
+            
             coords = ss_return_dict["coords"]
             slat = self.sample_slat(
                 slat_input_dict,

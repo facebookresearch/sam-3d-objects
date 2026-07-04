@@ -1,1 +1,11 @@
 __pycache__
+outputs/
+logs/
+checkpoints/
+*.ply
+*.pt
+*.pth
+*.ckpt
+*.sif
+*.csv
+*.png

@@ -1,0 +1,118 @@
+experiment:
+  name: train_regid
+  output_dir: ./outputs/train_regid_mask05_dt05_bicycle_original
+data:
+  data_dir: /work/goet1019/dataset/mip_nerf360/3dgs_camera_pose/bicycle
+  image_folder: images_4
+  mask_folder: masks
+  sparse_folder: sparse/0
+
+
+model:
+  gt_ply_path: /work/goet1019/dataset/mip_nerf360/3dgs_models/bicycle/point_cloud/iteration_30000/point_cloud.ply
+  sam3d_ply_path: /work/goet1019/sam-3d-objects/lab_test_for_python/some_basic_pointcloud/bicycle_select_position.ply
+
+
+training:
+  device: cuda
+  iterations: 9800
+  batch_size: 1
+  num_workers: 4
+  save_every: 10
+
+
+optimizer:
+  lr_translation: 0.001
+  lr_rotation: 0.0005
+  lr_scale: 0.0001
+  eps: 1.0e-15
+
+
+loss:
+  use_photo: false
+  lambda_photo: 1.0
+  lambda_dssim: 0.2
+  disable_ssim: false
+
+  use_arap: false
+  lambda_arap: 1.0
+  arap_type: both
+  normalized_arap: true
+
+  use_mask: true
+  lambda_mask: 0.5
+  lambda_mask_l1: 1
+  lambda_mask_iou: 1
+
+  use_dt: true
+  lambda_dt: 0.5
+
+
+loss_balance:
+  enabled: false
+  mode: contribution
+  photo_target: 0.5
+  arap_target: 0.5
+  mask_target: 0.5
+  dt_target: 0.5
+  
+  eps: 1.0e-8
+  min_weight: 1.0e-4
+  max_weight: 100.0
+
+debug:
+  save_ply: true
+  save_images: true
+  save_graph_ply: false
+  
+
+stage2_crop:
+  enabled: true
+
+  input:
+    aligned_sam3d_ply: finetuned_epoch_50/finetuned_epoch_50.ply
+    scene_ply_path: /work/goet1019/path/to/original_3dgs/point_cloud/iteration_30000/point_cloud.ply
+
+  crop:
+    method: aabb
+    margin_ratio: 0.25
+    use_gaussian_center_only: true
+
+  output:
+    cropped_gaussians_ply: cropped_candidates.ply
+    crop_indices: crop_indices.pt
+    crop_bbox: crop_bbox.pt
+
+
+stage3_finetune:
+  experiment:
+    output_dir: stage3_finetune_all_loss
+  training:
+    device: cuda
+    iterations: 9800
+    batch_size: 1
+    num_workers: 4
+    save_every: 10
+
+  optimizer:
+    zi_lr: 0.01
+
+  loss:
+    use_mask: true
+    lambda_mask: 0.5
+
+    use_dt: true
+    lambda_dt: 0.5
+
+    use_sam3d: true
+    lambda_sam3d: 0.5
+    sam3d_margin_ratio: 0.01
+    sam3d_sigma_ratio: 0.003
+    sam3d_neg_weight: 0.5
+
+
+    use_tv: true
+    tv_use_edge_weight: true
+    lambda_tv: 0.5
+    tv_start_iter: 1000
+    tv_k: 8
