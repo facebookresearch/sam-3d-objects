@@ -68,7 +68,8 @@ class InstancePose:
 
         # Apply transform to shape (B * K)
         pc_transform = transform_to_postcompose.get_matrix()
-        pc_transform = pc_transform.repeat(k, 1, 1)
+        # Objects are flattened scene by scene from (B, K, C).
+        pc_transform = pc_transform.repeat_interleave(k, dim=0)
         stacked_pc_transform = Transform3d(matrix=pc_transform)
         assert stacked_pc_transform.get_matrix().shape == composed.get_matrix().shape
         postcomposed = composed.compose(stacked_pc_transform)
