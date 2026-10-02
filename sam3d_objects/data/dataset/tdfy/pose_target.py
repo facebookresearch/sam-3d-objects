@@ -778,7 +778,7 @@ class LogScaleShiftNormalizer:
         self.scale_log = scale_log
 
     def normalize(self, value: torch.Tensor):
-        return torch.log(value) - self.shift_log / self.scale_log
+        return (torch.log(value) - self.shift_log) / self.scale_log
 
     def denormalize(self, value: torch.Tensor):
         return torch.exp(value * self.scale_log + self.shift_log)
